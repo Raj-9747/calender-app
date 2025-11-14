@@ -21,11 +21,13 @@ const AddEventModal = ({
 }: AddEventModalProps) => {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [meetingLink, setMeetingLink] = useState("");
 
   useEffect(() => {
     if (!isOpen) {
       setTitle("");
       setDescription("");
+      setMeetingLink("");
     }
   }, [isOpen]);
 
@@ -115,6 +117,24 @@ const AddEventModal = ({
               className="w-full min-h-[120px] resize-none"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
+              onKeyPress={handleKeyPress}
+            />
+          </div>
+
+          <div>
+            <label
+              htmlFor="eventMeetingLink"
+              className="block text-sm font-medium text-foreground mb-2"
+            >
+              Meeting Link
+            </label>
+            <Input
+              id="eventMeetingLink"
+              type="url"
+              placeholder="https://meet.google.com/..."
+              className="w-full"
+              value={meetingLink}
+              onChange={(e) => setMeetingLink(e.target.value)}
               onKeyPress={handleKeyPress}
             />
           </div>

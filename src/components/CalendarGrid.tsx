@@ -68,46 +68,59 @@ const CalendarGrid = ({
   const dates = generateCalendarDates();
 
   return (
-    <div className="bg-card rounded-lg shadow-[var(--shadow-md)] p-6">
+    <div className="rounded-3xl border border-[#d2d6e3] bg-white shadow-sm">
       {/* Days of Week Header */}
-      <div className="grid grid-cols-7 gap-2 mb-4">
+      <div className="grid grid-cols-7 border-b border-[#e0e3eb] text-xs font-semibold uppercase tracking-wide text-[#5f6368]">
         {daysOfWeek.map((day) => (
-          <div
-            key={day}
-            className="text-center text-sm font-medium text-muted-foreground py-2"
-          >
+          <div key={day} className="px-4 py-3 text-right">
             {day}
           </div>
         ))}
       </div>
 
       {/* Calendar Grid */}
-      <div id="calendar" className="grid grid-cols-7 gap-2">
+      <div id="calendar" className="grid grid-cols-7">
         {dates.map((date, index) => {
           if (!date) return null;
 
           const dayEvents = renderEvents(date);
           const today = isToday(date);
           const currentMonth = isCurrentMonth(date);
+          const isFirstOfMonth = date.getDate() === 1;
 
           return (
-            <div
-              key={index}
+            <button
+              type="button"
+              key={`day-${index}`}
               className={`
-                min-h-[100px] p-2 rounded-lg border transition-all cursor-pointer
-                ${today ? "border-calendar-today border-2" : "border-border"}
-                ${currentMonth ? "bg-card" : "bg-muted/30"}
-                ${!currentMonth && "text-muted-foreground"}
-                hover:bg-calendar-hover hover:shadow-[var(--shadow-sm)]
+                flex min-h-[130px] flex-col border-b border-r border-[#e0e3eb] p-3 text-left transition
+                ${currentMonth ? "bg-white" : "bg-[#f8f9fa] text-[#9aa0a6]"}
+                ${today ? "relative" : ""}
+                hover:bg-[#f1f3f4]
               `}
               onClick={() => onDateClick(date)}
             >
-              <div className="text-sm font-medium mb-1">{date.getDate()}</div>
-              <div className="space-y-1">
+              <div className="flex items-center justify-between text-xs font-medium text-[#5f6368]">
+                <span>{isFirstOfMonth ? date.toLocaleString(undefined, { month: "short" }) : ""}</span>
+                <span
+                  className={`
+                    flex h-7 w-7 items-center justify-center rounded-full text-sm font-semibold
+                    ${today ? "bg-[#1a73e8] text-white" : "text-[#3c4043]"}
+                  `}
+                >
+                  {date.getDate()}
+                </span>
+              </div>
+
+              <div className="mt-2 flex flex-col gap-1">
+                {dayEvents.length === 0 && (
+                  <span className="text-xs text-transparent">placeholder</span>
+                )}
+
                 {dayEvents.map((event) => (
                   <div
                     key={event.id}
-                    className="bg-event-tag text-white text-xs px-2 py-1 rounded-full truncate"
+                    className="rounded-lg border border-[#cfe0fc] bg-[#e8f0fe] px-2 py-1 text-xs font-medium text-[#1a73e8] line-clamp-2"
                     onClick={(e) => {
                       e.stopPropagation();
                       onEventClick(event);
@@ -117,7 +130,7 @@ const CalendarGrid = ({
                   </div>
                 ))}
               </div>
-            </div>
+            </button>
           );
         })}
       </div>

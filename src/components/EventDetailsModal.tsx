@@ -59,6 +59,23 @@ const EventDetailsModal = ({ isOpen, event, onClose }: EventDetailsModalProps) =
           </p>
         </div>
 
+        <div
+          id="detailMeetingLink"
+          className={`mb-6 ${event.meetingLink ? "" : "hidden"}`}
+        >
+          <h3 className="text-sm font-medium text-foreground mb-2">Meeting Link</h3>
+          {event.meetingLink && (
+            <a
+              href={event.meetingLink}
+              target="_blank"
+              rel="noreferrer"
+              className="text-[#1a73e8] text-sm font-medium hover:underline"
+            >
+              Join Meeting
+            </a>
+          )}
+        </div>
+
         {/* Close Button */}
         <div className="flex justify-end">
           <Button variant="outline" className="hover:bg-secondary" onClick={onClose}>
