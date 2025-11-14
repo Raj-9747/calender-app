@@ -35,22 +35,32 @@ export interface AppointmentSchedule {
   notes: string;
 }
 
-type SupabaseEventRow = {
+type SupabaseBookingRow = {
   id: string;
-  title: string;
-  description: string | null;
-  date: string;
-  meeting_link: string | null;
+  product_name: string | null;
+  summary: string | null;
+  booking_time: string;
+  meet_link: string | null;
 };
 
-const normalizeEvents = (rows: SupabaseEventRow[]): CalendarEvent[] =>
-  rows.map((row) => ({
-    id: row.id,
-    title: row.title,
-    description: row.description ?? "",
-    date: row.date,
-    meetingLink: row.meeting_link ?? "",
-  }));
+const normalizeEvents = (rows: SupabaseBookingRow[]): CalendarEvent[] =>
+  rows.map((row) => {
+    // Extract date from booking_time (TIMESTAMPTZ format)
+    const bookingDate = row.booking_time ? new Date(row.booking_time) : new Date();
+    // Format date as YYYY-MM-DD
+    const year = bookingDate.getFullYear();
+    const month = String(bookingDate.getMonth() + 1).padStart(2, "0");
+    const day = String(bookingDate.getDate()).padStart(2, "0");
+    const dateStr = `${year}-${month}-${day}`;
+    
+    return {
+      id: row.id,
+      title: row.product_name ?? "",
+      description: row.summary ?? "",
+      date: dateStr,
+      meetingLink: row.meet_link ?? "",
+    };
+  });
 
 const generateId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 
@@ -76,9 +86,9 @@ const Index = () => {
 
   const loadEvents = useCallback(async (): Promise<CalendarEvent[]> => {
     const { data, error } = await supabase
-      .from("events")
-      .select("id, title, description, date, meeting_link")
-      .order("date", { ascending: true });
+      .from("bookings")
+      .select("id, product_name, summary, booking_time, meet_link")
+      .order("booking_time", { ascending: true });
 
     if (error) {
       console.error("Failed to load events:", error);
@@ -141,10 +151,19 @@ const Index = () => {
           : null;
       const meetingLink = meetingInput?.value?.trim() ?? "";
 
+      // Convert date string (YYYY-MM-DD) to TIMESTAMPTZ format
+      // Append time 00:00:00 and timezone to make it a proper timestamp
+      const bookingTime = `${date}T00:00:00Z`;
+
       setIsSavingEvent(true);
       const { data, error } = await supabase
-        .from("events")
-        .insert({ title, description, date, meeting_link: meetingLink })
+        .from("bookings")
+        .insert({ 
+          product_name: title, 
+          summary: description, 
+          booking_time: bookingTime, 
+          meet_link: meetingLink || null 
+        })
         .select()
         .single();
 
@@ -159,7 +178,7 @@ const Index = () => {
         return null;
       }
 
-      const normalized = normalizeEvents([data as SupabaseEventRow])[0];
+      const normalized = normalizeEvents([data as SupabaseBookingRow])[0];
       setEvents((prev) => [...prev, normalized]);
       return normalized;
     },
