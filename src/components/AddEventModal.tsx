@@ -8,10 +8,17 @@ interface AddEventModalProps {
   isOpen: boolean;
   selectedDate: Date | null;
   onClose: () => void;
-  onAddEvent: (title: string, description: string) => void;
+  onAddEvent: (title: string, description: string) => Promise<void>;
+  isSaving: boolean;
 }
 
-const AddEventModal = ({ isOpen, selectedDate, onClose, onAddEvent }: AddEventModalProps) => {
+const AddEventModal = ({
+  isOpen,
+  selectedDate,
+  onClose,
+  onAddEvent,
+  isSaving,
+}: AddEventModalProps) => {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
 
@@ -34,9 +41,9 @@ const AddEventModal = ({ isOpen, selectedDate, onClose, onAddEvent }: AddEventMo
     return date.toLocaleDateString("en-US", options);
   };
 
-  const handleSubmit = () => {
-    if (!title.trim()) return;
-    onAddEvent(title, description);
+  const handleSubmit = async () => {
+    if (!title.trim() || isSaving) return;
+    await onAddEvent(title, description);
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -121,9 +128,9 @@ const AddEventModal = ({ isOpen, selectedDate, onClose, onAddEvent }: AddEventMo
           <Button
             className="bg-primary hover:bg-primary/90"
             onClick={handleSubmit}
-            disabled={!title.trim()}
+            disabled={!title.trim() || isSaving}
           >
-            Save Event
+            {isSaving ? "Saving..." : "Save Event"}
           </Button>
         </div>
       </div>

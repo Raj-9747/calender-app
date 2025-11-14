@@ -3,14 +3,14 @@ import { CalendarEvent } from "@/pages/Index";
 interface CalendarGridProps {
   currentDate: Date;
   onDateClick: (date: Date) => void;
-  getEventsForDate: (date: Date) => CalendarEvent[];
+  renderEvents: (date: Date) => CalendarEvent[];
   onEventClick: (event: CalendarEvent) => void;
 }
 
 const CalendarGrid = ({
   currentDate,
   onDateClick,
-  getEventsForDate,
+  renderEvents,
   onEventClick,
 }: CalendarGridProps) => {
   const daysOfWeek = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -86,7 +86,7 @@ const CalendarGrid = ({
         {dates.map((date, index) => {
           if (!date) return null;
 
-          const dayEvents = getEventsForDate(date);
+          const dayEvents = renderEvents(date);
           const today = isToday(date);
           const currentMonth = isCurrentMonth(date);
 

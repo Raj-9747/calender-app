@@ -71,3 +71,21 @@ Yes, you can!
 To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
 
 Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+
+## Supabase configuration
+
+Add a `.env` file in the project root (or update your existing one) and map the provided connection string to the values expected by Vite:
+
+```env
+VITE_SUPABASE_URL=https://zuewttgampqdaovytdkz.supabase.co
+VITE_SUPABASE_ANON_KEY=<your_supabase_anon_key>
+# Optional: let the app derive the URL for you from the connection string
+VITE_SUPABASE_CONNECTION_STRING=postgresql://postgres:<password>@db.zuewttgampqdaovytdkz.supabase.co:5432/postgres
+```
+
+These correspond to the original connection string pieces:
+
+- `SUPABASE_URL` → `https://zuewttgampqdaovytdkz.supabase.co`
+- `SUPABASE_ANON_KEY` → paste the anon/public key from your Supabase project settings
+
+After updating the environment variables, restart the dev server so Vite can pick them up. The calendar app will then read the values via `import.meta.env`.
