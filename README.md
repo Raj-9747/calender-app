@@ -1,5 +1,5 @@
-# Welcome to your Lovable project
 
+<<<<<<< HEAD
 ## Project info
 
 **URL**: https://lovable.dev/projects/9d46d372-eac7-4405-a2bd-00de687e87c9
@@ -89,3 +89,5 @@ These correspond to the original connection string pieces:
 - `SUPABASE_ANON_KEY` → paste the anon/public key from your Supabase project settings
 
 After updating the environment variables, restart the dev server so Vite can pick them up. The calendar app will then read the values via `import.meta.env`.
+=======
+>>>>>>> 39417e9249c9b0e79127bba29a41787396d96bd8
