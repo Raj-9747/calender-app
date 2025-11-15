@@ -1,8 +1,9 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { Menu, Search, CircleUserRound, LogOut } from "lucide-react";
+import { Menu, Search, CircleUserRound, LogOut, Calendar as CalendarIcon } from "lucide-react";
 import CalendarHeader from "@/components/CalendarHeader";
 import CalendarGrid from "@/components/CalendarGrid";
+import DayView from "@/components/DayView";
 import AddEventModal from "@/components/AddEventModal";
 import EventDetailsModal from "@/components/EventDetailsModal";
 import { supabase } from "@/lib/supabaseClient";
@@ -19,6 +20,11 @@ export interface CalendarEvent {
   description: string;
   date: string; // YYYY-MM-DD format
   meetingLink?: string;
+  teamMember?: string;
+  duration?: number; // Duration in minutes
+  startTime?: string; // ISO timestamp
+  endTime?: string; // ISO timestamp
+  bookingTime?: string; // Original booking_time from database
 }
 
 export interface TaskItem {
@@ -44,6 +50,8 @@ type SupabaseBookingRow = {
   summary: string | null;
   booking_time: string;
   meet_link: string | null;
+  team_member: string | null;
+  duration: number | null;
 };
 
 const normalizeEvents = (rows: SupabaseBookingRow[]): CalendarEvent[] =>
@@ -56,22 +64,39 @@ const normalizeEvents = (rows: SupabaseBookingRow[]): CalendarEvent[] =>
     const day = String(bookingDate.getDate()).padStart(2, "0");
     const dateStr = `${year}-${month}-${day}`;
     
+    // Calculate start and end times
+    const startTime = row.booking_time;
+    const duration = row.duration ?? 60; // Default to 60 minutes if not provided
+    const endTime = startTime
+      ? new Date(new Date(startTime).getTime() + duration * 60000).toISOString()
+      : undefined;
+    
     return {
       id: row.id,
       title: row.product_name ?? "",
       description: row.summary ?? "",
       date: dateStr,
       meetingLink: row.meet_link ?? "",
+      teamMember: row.team_member ?? undefined,
+      duration: duration,
+      startTime: startTime,
+      endTime: endTime,
+      bookingTime: row.booking_time,
     };
   });
 
 const generateId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 
+type ViewMode = "month" | "day";
+
 const Index = () => {
   const navigate = useNavigate();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [viewMode, setViewMode] = useState<ViewMode>("month");
+  const [dayViewDate, setDayViewDate] = useState<Date>(new Date());
   const [events, setEvents] = useState<CalendarEvent[]>([]);
+  const [dayViewEvents, setDayViewEvents] = useState<CalendarEvent[]>([]);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
@@ -87,6 +112,67 @@ const Index = () => {
     const storedTeamMember = localStorage.getItem("team_member");
     setTeamMember(storedTeamMember);
   }, []);
+
+  // Check if user is admin
+  const isAdmin = useMemo(() => {
+    return teamMember?.toLowerCase() === "admin";
+  }, [teamMember]);
+
+  // Generate color map for team members (admin only)
+  // Uses hash function to ensure same team member always gets same color
+  const teamMemberColors = useMemo(() => {
+    if (!isAdmin) return undefined;
+
+    const colors = [
+      "#1a73e8", // Blue
+      "#ea4335", // Red
+      "#34a853", // Green
+      "#fbbc04", // Yellow
+      "#9c27b0", // Purple
+      "#ff9800", // Orange
+      "#00bcd4", // Cyan
+      "#e91e63", // Pink
+      "#4caf50", // Light Green
+      "#3f51b5", // Indigo
+      "#ff5722", // Deep Orange
+      "#009688", // Teal
+      "#795548", // Brown
+      "#607d8b", // Blue Grey
+      "#cddc39", // Lime
+      "#ffc107", // Amber
+    ];
+
+    // Simple hash function to get consistent color for same team member
+    const hashString = (str: string): number => {
+      let hash = 0;
+      for (let i = 0; i < str.length; i++) {
+        const char = str.charCodeAt(i);
+        hash = ((hash << 5) - hash) + char;
+        hash = hash & hash; // Convert to 32-bit integer
+      }
+      return Math.abs(hash);
+    };
+
+    const colorMap = new Map<string, string>();
+    const uniqueMembers = new Set<string>();
+
+    // Collect all unique team members from events (both month and day view)
+    [...events, ...dayViewEvents].forEach((event) => {
+      if (event.teamMember) {
+        uniqueMembers.add(event.teamMember);
+      }
+    });
+
+    // Assign colors to team members using hash for consistency
+    // This ensures same team member always gets same color
+    Array.from(uniqueMembers).forEach((member) => {
+      const hash = hashString(member);
+      const colorIndex = hash % colors.length;
+      colorMap.set(member, colors[colorIndex]);
+    });
+
+    return colorMap;
+  }, [events, dayViewEvents, isAdmin]);
 
   const handleLogout = () => {
     localStorage.removeItem("team_member");
@@ -114,7 +200,7 @@ const Index = () => {
     // Build query based on role
     let query = supabase
       .from("bookings")
-      .select("id, product_name, summary, booking_time, meet_link");
+      .select("id, product_name, summary, booking_time, meet_link, team_member, duration");
 
     // If not admin, filter by team_member
     if (teamMember.toLowerCase() !== "admin") {
@@ -139,6 +225,57 @@ const Index = () => {
     setEvents(normalized);
     return normalized;
   }, []);
+
+  // Load events for a specific date (for day view)
+  const loadDayViewEvents = useCallback(
+    async (date: Date): Promise<CalendarEvent[]> => {
+      // Get team member from localStorage
+      const teamMember = localStorage.getItem("team_member");
+
+      if (!teamMember) {
+        console.error("No team member found in localStorage");
+        setDayViewEvents([]);
+        return [];
+      }
+
+      // Format date as YYYY-MM-DD
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, "0");
+      const day = String(date.getDate()).padStart(2, "0");
+      const dateStr = `${year}-${month}-${day}`;
+
+      // Build query - filter by date
+      let query = supabase
+        .from("bookings")
+        .select("id, product_name, summary, booking_time, meet_link, team_member, duration")
+        .gte("booking_time", `${dateStr}T00:00:00Z`)
+        .lt("booking_time", `${dateStr}T23:59:59Z`);
+
+      // If not admin, filter by team_member
+      if (teamMember.toLowerCase() !== "admin") {
+        query = query.eq("team_member", teamMember);
+      }
+
+      // Order by booking_time
+      query = query.order("booking_time", { ascending: true });
+
+      const { data, error } = await query;
+
+      if (error) {
+        console.error("Failed to load day events:", error);
+        toast.error("Failed to load events", {
+          description: error.message || "Please check your connection and try again.",
+        });
+        setDayViewEvents([]);
+        return [];
+      }
+
+      const normalized = data ? normalizeEvents(data) : [];
+      setDayViewEvents(normalized);
+      return normalized;
+    },
+    []
+  );
 
   useEffect(() => {
     loadEvents();
@@ -167,8 +304,19 @@ const Index = () => {
   };
 
   const handleSidebarDateSelect = (date: Date) => {
-    setCurrentDate(new Date(date.getFullYear(), date.getMonth(), date.getDate()));
+    const selectedDateObj = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    setCurrentDate(selectedDateObj);
+    setDayViewDate(selectedDateObj);
+    setViewMode("day");
+    loadDayViewEvents(selectedDateObj);
   };
+
+  // Load day view events when dayViewDate changes
+  useEffect(() => {
+    if (viewMode === "day") {
+      loadDayViewEvents(dayViewDate);
+    }
+  }, [dayViewDate, viewMode, loadDayViewEvents]);
 
   const handleCreateAction = (type: "event" | "task" | "appointment") => {
     if (type === "event") {
@@ -382,19 +530,91 @@ const Index = () => {
             onCreate={handleCreateAction}
           />
 
-          <main className="flex-1 min-w-0 overflow-y-auto px-4 py-6 sm:px-6 lg:px-10">
-            <CalendarHeader
-              currentDate={currentDate}
-              onPrevMonth={handlePrevMonth}
-              onNextMonth={handleNextMonth}
-              onToday={handleToday}
-            />
-            <CalendarGrid
-              currentDate={currentDate}
-              onDateClick={handleDateClick}
-              renderEvents={renderEvents}
-              onEventClick={showEventDetails}
-            />
+          <main className="flex-1 min-w-0 overflow-hidden flex flex-col">
+            {viewMode === "month" ? (
+              <>
+                <div className="px-4 py-6 sm:px-6 lg:px-10">
+                  <CalendarHeader
+                    currentDate={currentDate}
+                    onPrevMonth={handlePrevMonth}
+                    onNextMonth={handleNextMonth}
+                    onToday={handleToday}
+                  />
+                </div>
+                <div className="flex-1 overflow-y-auto px-4 pb-6 sm:px-6 lg:px-10">
+                  <CalendarGrid
+                    currentDate={currentDate}
+                    onDateClick={handleDateClick}
+                    renderEvents={renderEvents}
+                    onEventClick={showEventDetails}
+                    teamMemberColors={teamMemberColors}
+                    isAdmin={isAdmin}
+                  />
+                </div>
+              </>
+            ) : (
+              <div className="flex-1 flex flex-col">
+                <div className="flex items-center justify-between px-6 py-4 border-b border-[#e0e3eb] bg-white">
+                  <div className="flex items-center gap-4">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setViewMode("month");
+                        setCurrentDate(dayViewDate);
+                      }}
+                      className="text-[#5f6368] hover:text-[#202124]"
+                    >
+                      <CalendarIcon className="h-4 w-4 mr-2" />
+                      Back to Month View
+                    </Button>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        const prevDay = new Date(dayViewDate);
+                        prevDay.setDate(prevDay.getDate() - 1);
+                        setDayViewDate(prevDay);
+                      }}
+                    >
+                      Previous Day
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        const today = new Date();
+                        setDayViewDate(today);
+                      }}
+                    >
+                      Today
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        const nextDay = new Date(dayViewDate);
+                        nextDay.setDate(nextDay.getDate() + 1);
+                        setDayViewDate(nextDay);
+                      }}
+                    >
+                      Next Day
+                    </Button>
+                  </div>
+                </div>
+                <div className="flex-1 overflow-hidden flex flex-col min-h-0">
+                  <DayView
+                    date={dayViewDate}
+                    events={dayViewEvents}
+                    onEventClick={showEventDetails}
+                    teamMemberColors={teamMemberColors}
+                    isAdmin={isAdmin}
+                  />
+                </div>
+              </div>
+            )}
           </main>
         </div>
       </div>

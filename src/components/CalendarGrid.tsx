@@ -5,6 +5,8 @@ interface CalendarGridProps {
   onDateClick: (date: Date) => void;
   renderEvents: (date: Date) => CalendarEvent[];
   onEventClick: (event: CalendarEvent) => void;
+  teamMemberColors?: Map<string, string>;
+  isAdmin?: boolean;
 }
 
 const CalendarGrid = ({
@@ -12,7 +14,30 @@ const CalendarGrid = ({
   onDateClick,
   renderEvents,
   onEventClick,
+  teamMemberColors,
+  isAdmin = false,
 }: CalendarGridProps) => {
+  // Get color for event based on team member
+  const getEventColor = (event: CalendarEvent): { bg: string; border: string; text: string } => {
+    if (isAdmin && event.teamMember && teamMemberColors) {
+      const color = teamMemberColors.get(event.teamMember) || "#1a73e8";
+      // Convert hex to rgba for background with opacity
+      const r = parseInt(color.slice(1, 3), 16);
+      const g = parseInt(color.slice(3, 5), 16);
+      const b = parseInt(color.slice(5, 7), 16);
+      return {
+        bg: `rgba(${r}, ${g}, ${b}, 0.1)`,
+        border: `rgba(${r}, ${g}, ${b}, 0.3)`,
+        text: color,
+      };
+    }
+    // Default blue color for non-admin or events without team member
+    return {
+      bg: "#e8f0fe",
+      border: "#cfe0fc",
+      text: "#1a73e8",
+    };
+  };
   const daysOfWeek = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
   // Generate calendar dates
@@ -117,18 +142,28 @@ const CalendarGrid = ({
                   <span className="text-xs text-transparent">placeholder</span>
                 )}
 
-                {dayEvents.map((event) => (
-                  <div
-                    key={event.id}
-                    className="rounded-lg border border-[#cfe0fc] bg-[#e8f0fe] px-2 py-1 text-xs font-medium text-[#1a73e8] line-clamp-2"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onEventClick(event);
-                    }}
-                  >
-                    {event.title}
-                  </div>
-                ))}
+                {dayEvents.map((event) => {
+                  const colors = getEventColor(event);
+                  return (
+                    <div
+                      key={event.id}
+                      className="rounded-lg px-2 py-1 text-xs font-medium line-clamp-2 cursor-pointer hover:opacity-80 transition-opacity"
+                      style={{
+                        backgroundColor: colors.bg,
+                        borderColor: colors.border,
+                        color: colors.text,
+                        borderWidth: "1px",
+                        borderStyle: "solid",
+                      }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onEventClick(event);
+                      }}
+                    >
+                      {event.title}
+                    </div>
+                  );
+                })}
               </div>
             </button>
           );

@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { X } from "lucide-react";
+import { X, Video, Clock, User } from "lucide-react";
 import { CalendarEvent } from "@/pages/Index";
 
 interface EventDetailsModalProps {
@@ -20,7 +20,23 @@ const EventDetailsModal = ({ isOpen, event, onClose }: EventDetailsModalProps) =
     return date.toLocaleDateString("en-US", options);
   };
 
+  // Convert 24-hour time to 12-hour format for display
+  const formatTime12Hour = (isoString?: string): string => {
+    if (!isoString) return "N/A";
+    const date = new Date(isoString);
+    return date.toLocaleTimeString("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+    });
+  };
+
   if (!isOpen || !event) return null;
+
+  // Format times in 12-hour format for display
+  const startTime = event.startTime ? formatTime12Hour(event.startTime) : null;
+  const endTime = event.endTime ? formatTime12Hour(event.endTime) : null;
+  const duration = event.duration ?? null;
 
   return (
     <div
@@ -51,6 +67,44 @@ const EventDetailsModal = ({ isOpen, event, onClose }: EventDetailsModalProps) =
           </button>
         </div>
 
+        {/* Time Information */}
+        {(startTime || endTime || duration) && (
+          <div className="mb-6 space-y-2">
+            {startTime && (
+              <div className="flex items-center gap-2 text-sm">
+                <Clock className="h-4 w-4 text-muted-foreground" />
+                <span className="text-muted-foreground">Start:</span>
+                <span className="text-foreground font-medium">{startTime}</span>
+              </div>
+            )}
+            {endTime && (
+              <div className="flex items-center gap-2 text-sm">
+                <Clock className="h-4 w-4 text-muted-foreground" />
+                <span className="text-muted-foreground">End:</span>
+                <span className="text-foreground font-medium">{endTime}</span>
+              </div>
+            )}
+            {duration && (
+              <div className="flex items-center gap-2 text-sm">
+                <Clock className="h-4 w-4 text-muted-foreground" />
+                <span className="text-muted-foreground">Duration:</span>
+                <span className="text-foreground font-medium">{duration} minutes</span>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Team Member */}
+        {event.teamMember && (
+          <div className="mb-6">
+            <div className="flex items-center gap-2 text-sm mb-2">
+              <User className="h-4 w-4 text-muted-foreground" />
+              <h3 className="text-sm font-medium text-foreground">Team Member</h3>
+            </div>
+            <p className="text-sm text-muted-foreground ml-6">{event.teamMember}</p>
+          </div>
+        )}
+
         {/* Description */}
         <div className="mb-6">
           <h3 className="text-sm font-medium text-foreground mb-2">Description</h3>
@@ -59,22 +113,23 @@ const EventDetailsModal = ({ isOpen, event, onClose }: EventDetailsModalProps) =
           </p>
         </div>
 
-        <div
-          id="detailMeetingLink"
-          className={`mb-6 ${event.meetingLink ? "" : "hidden"}`}
-        >
-          <h3 className="text-sm font-medium text-foreground mb-2">Meeting Link</h3>
-          {event.meetingLink && (
+        {/* Meeting Link */}
+        {event.meetingLink && (
+          <div id="detailMeetingLink" className="mb-6">
+            <div className="flex items-center gap-2 text-sm mb-2">
+              <Video className="h-4 w-4 text-muted-foreground" />
+              <h3 className="text-sm font-medium text-foreground">Meeting Link</h3>
+            </div>
             <a
               href={event.meetingLink}
               target="_blank"
               rel="noreferrer"
-              className="text-[#1a73e8] text-sm font-medium hover:underline"
+              className="text-[#1a73e8] text-sm font-medium hover:underline ml-6"
             >
-              Join Meeting
+              {event.meetingLink}
             </a>
-          )}
-        </div>
+          </div>
+        )}
 
         {/* Close Button */}
         <div className="flex justify-end">
