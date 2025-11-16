@@ -382,14 +382,10 @@ const Index = () => {
   };
 
   const saveEvent = useCallback(
-    async (title: string, description: string, date: string): Promise<CalendarEvent | null> => {
-      const meetingInput =
-        typeof document !== "undefined"
-          ? (document.getElementById("eventMeetingLink") as HTMLInputElement | null)
-          : null;
+    async (title: string, description: string, date: string, meetingLink?: string): Promise<CalendarEvent | null> => {
       // Convert empty string to null to avoid unique constraint violations
-      const meetingLinkRaw = meetingInput?.value?.trim() ?? "";
-      const meetingLink = meetingLinkRaw === "" ? null : meetingLinkRaw;
+      const meetingLinkRaw = meetingLink?.trim() ?? "";
+      const meetingLinkValue = meetingLinkRaw === "" ? null : meetingLinkRaw;
 
       // Convert date string (YYYY-MM-DD) to TIMESTAMPTZ format
       // Append time 00:00:00 and timezone to make it a proper timestamp
@@ -413,7 +409,7 @@ const Index = () => {
             product_name: title, 
             summary: description, 
             booking_time: bookingTime, 
-            meet_link: meetingLink,
+            meet_link: meetingLinkValue,
             team_member: teamMember
           })
           .select()
@@ -468,7 +464,7 @@ const Index = () => {
     []
   );
 
-  const handleAddEvent = async (title: string, description: string) => {
+  const handleAddEvent = async (title: string, description: string, meetingLink?: string) => {
     if (!selectedDate) {
       toast.error("No date selected", {
         description: "Please select a date for the event.",
@@ -476,7 +472,7 @@ const Index = () => {
       return;
     }
     const dateString = formatDate(selectedDate);
-    const newEvent = await saveEvent(title, description, dateString);
+    const newEvent = await saveEvent(title, description, dateString, meetingLink);
     if (newEvent) {
       setIsAddModalOpen(false);
       setSelectedDate(null);

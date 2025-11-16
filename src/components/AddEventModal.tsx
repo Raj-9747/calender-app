@@ -8,7 +8,7 @@ interface AddEventModalProps {
   isOpen: boolean;
   selectedDate: Date | null;
   onClose: () => void;
-  onAddEvent: (title: string, description: string) => Promise<void>;
+  onAddEvent: (title: string, description: string, meetingLink?: string) => Promise<void>;
   isSaving: boolean;
 }
 
@@ -45,7 +45,7 @@ const AddEventModal = ({
 
   const handleSubmit = async () => {
     if (!title.trim() || isSaving) return;
-    await onAddEvent(title, description);
+    await onAddEvent(title, description, meetingLink);
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
