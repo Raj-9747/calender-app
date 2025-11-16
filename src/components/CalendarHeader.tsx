@@ -57,7 +57,7 @@ const CalendarHeader = ({ currentDate, onPrevMonth, onNextMonth, onToday }: Cale
           </h1>
         </div>
 
-        <div className="flex items-center gap-2 rounded-full border border-[#d2d6e3] bg-white p-1">
+        {/* <div className="flex items-center gap-2 rounded-full border border-[#d2d6e3] bg-white p-1">
           {viewOptions.map((option) => (
             <button
               key={option}
@@ -72,7 +72,7 @@ const CalendarHeader = ({ currentDate, onPrevMonth, onNextMonth, onToday }: Cale
               {option}
             </button>
           ))}
-        </div>
+        </div> */}
       </div>
 
       <div className="text-sm text-[#5f6368]">

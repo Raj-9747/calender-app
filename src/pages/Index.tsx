@@ -485,14 +485,14 @@ const Index = () => {
               <span className="text-xl font-semibold text-[#5f6368]">Calendar</span>
             </div>
           </div>
-
+{/* 
           <div className="hidden max-w-md flex-1 items-center gap-2 rounded-full border border-[#d2d6e3] bg-[#f1f3f4] px-4 py-2 text-sm text-[#5f6368] md:flex">
             <Search className="h-4 w-4" />
             <Input
               placeholder="Search people and events"
               className="h-auto border-none bg-transparent p-0 text-sm placeholder:text-[#5f6368] focus-visible:ring-0"
             />
-          </div>
+          </div> */}
 
           <div className="flex items-center gap-3">
             {teamMember && (
@@ -500,12 +500,12 @@ const Index = () => {
                 {teamMember}
               </span>
             )}
-            <button
+            {/* <button
               type="button"
               className="hidden rounded-full border border-[#d2d6e3] px-4 py-2 text-sm font-medium text-[#5f6368] hover:bg-[#f1f3f4] md:inline-flex"
             >
               Support
-            </button>
+            </button> */}
             <Button
               type="button"
               variant="ghost"
