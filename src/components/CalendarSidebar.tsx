@@ -40,8 +40,7 @@ const CalendarSidebar = ({
     return [...events]
       .map((event) => ({ ...event, dateObj: toDate(event.date) }))
       .filter(({ dateObj }) => dateObj >= startOfToday)
-      .sort((a, b) => a.dateObj.getTime() - b.dateObj.getTime())
-      .slice(0, 4);
+      .sort((a, b) => a.dateObj.getTime() - b.dateObj.getTime());
   }, [events, startOfToday]);
 
   return (
@@ -84,7 +83,7 @@ const CalendarSidebar = ({
         <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-[#5f6368]">
           Upcoming events
         </h3>
-        <div className="space-y-3">
+        <div className="max-h-[300px] overflow-y-auto space-y-3 scrollbar-hide">
           {upcomingEvents.length === 0 && (
             <p className="text-sm text-[#5f6368]">Nothing planned. Click create to add one.</p>
           )}
