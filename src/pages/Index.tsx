@@ -13,6 +13,7 @@ import AddTaskModal from "@/components/AddTaskModal";
 import AppointmentScheduleModal from "@/components/AppointmentScheduleModal";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export interface CalendarEvent {
   id: string;
@@ -106,6 +107,8 @@ const Index = () => {
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
   const [isAppointmentModalOpen, setIsAppointmentModalOpen] = useState(false);
   const [teamMember, setTeamMember] = useState<string | null>(null);
+  const [selectedTeamMemberFilter, setSelectedTeamMemberFilter] = useState<string | null>(null);
+  const [availableTeamMembers, setAvailableTeamMembers] = useState<string[]>([]);
 
   // Load team member from localStorage on mount
   useEffect(() => {
@@ -117,6 +120,39 @@ const Index = () => {
   const isAdmin = useMemo(() => {
     return teamMember?.toLowerCase() === "admin";
   }, [teamMember]);
+
+  // Fetch distinct team members from bookings table (for admin dropdown)
+  const fetchTeamMembers = useCallback(async () => {
+    if (!isAdmin) return;
+
+    try {
+      const { data, error } = await supabase
+        .from("bookings")
+        .select("team_member")
+        .not("team_member", "is", null);
+
+      if (error) {
+        console.error("Failed to fetch team members:", error);
+        return;
+      }
+
+      // Get distinct team members
+      const distinctMembers = Array.from(
+        new Set(data.map((row) => row.team_member).filter((member): member is string => member !== null))
+      ).sort();
+
+      setAvailableTeamMembers(distinctMembers);
+    } catch (err) {
+      console.error("Error fetching team members:", err);
+    }
+  }, [isAdmin]);
+
+  // Fetch team members when admin logs in
+  useEffect(() => {
+    if (isAdmin) {
+      fetchTeamMembers();
+    }
+  }, [isAdmin, fetchTeamMembers]);
 
   // Generate color map for team members (admin only)
   // Uses hash function to ensure same team member always gets same color
@@ -202,10 +238,14 @@ const Index = () => {
       .from("bookings")
       .select("id, product_name, summary, booking_time, meet_link, team_member, duration");
 
-    // If not admin, filter by team_member
-    if (teamMember.toLowerCase() !== "admin") {
+    // If admin and a specific team member is selected, filter by that member
+    if (teamMember.toLowerCase() === "admin" && selectedTeamMemberFilter) {
+      query = query.eq("team_member", selectedTeamMemberFilter);
+    } else if (teamMember.toLowerCase() !== "admin") {
+      // If not admin, filter by team_member
       query = query.eq("team_member", teamMember);
     }
+    // If admin and no filter selected, show all events (no filter applied)
 
     // Order by booking_time
     query = query.order("booking_time", { ascending: true });
@@ -224,7 +264,7 @@ const Index = () => {
     const normalized = data ? normalizeEvents(data) : [];
     setEvents(normalized);
     return normalized;
-  }, []);
+  }, [selectedTeamMemberFilter]);
 
   // Load events for a specific date (for day view)
   const loadDayViewEvents = useCallback(
@@ -251,10 +291,14 @@ const Index = () => {
         .gte("booking_time", `${dateStr}T00:00:00Z`)
         .lt("booking_time", `${dateStr}T23:59:59Z`);
 
-      // If not admin, filter by team_member
-      if (teamMember.toLowerCase() !== "admin") {
+      // If admin and a specific team member is selected, filter by that member
+      if (teamMember.toLowerCase() === "admin" && selectedTeamMemberFilter) {
+        query = query.eq("team_member", selectedTeamMemberFilter);
+      } else if (teamMember.toLowerCase() !== "admin") {
+        // If not admin, filter by team_member
         query = query.eq("team_member", teamMember);
       }
+      // If admin and no filter selected, show all events (no filter applied)
 
       // Order by booking_time
       query = query.order("booking_time", { ascending: true });
@@ -274,12 +318,19 @@ const Index = () => {
       setDayViewEvents(normalized);
       return normalized;
     },
-    []
+    [selectedTeamMemberFilter]
   );
 
   useEffect(() => {
     loadEvents();
   }, [loadEvents]);
+
+  // Reload events when team member filter changes
+  useEffect(() => {
+    if (viewMode === "day") {
+      loadDayViewEvents(dayViewDate);
+    }
+  }, [selectedTeamMemberFilter, viewMode, dayViewDate, loadDayViewEvents]);
 
   const handlePrevMonth = () => {
     setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1));
@@ -495,6 +546,26 @@ const Index = () => {
           </div> */}
 
           <div className="flex items-center gap-3">
+            {isAdmin && (
+              <Select
+                value={selectedTeamMemberFilter || "all"}
+                onValueChange={(value) => {
+                  setSelectedTeamMemberFilter(value === "all" ? null : value);
+                }}
+              >
+                <SelectTrigger className="w-[180px] h-9 text-sm">
+                  <SelectValue placeholder="Select team member" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Members</SelectItem>
+                  {availableTeamMembers.map((member) => (
+                    <SelectItem key={member} value={member}>
+                      {member}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
             {teamMember && (
               <span className="hidden text-sm text-[#5f6368] md:inline-flex">
                 {teamMember}
@@ -528,6 +599,7 @@ const Index = () => {
             appointments={appointments}
             onSelectDate={handleSidebarDateSelect}
             onCreate={handleCreateAction}
+            onEventClick={showEventDetails}
           />
 
           <main className="flex-1 min-w-0 overflow-hidden flex flex-col">

@@ -13,6 +13,7 @@ interface CalendarSidebarProps {
   appointments: AppointmentSchedule[];
   onSelectDate: (date: Date) => void;
   onCreate: (type: "event" | "task" | "appointment") => void;
+  onEventClick: (event: CalendarEvent) => void;
 }
 
 const CalendarSidebar = ({
@@ -22,6 +23,7 @@ const CalendarSidebar = ({
   appointments,
   onSelectDate,
   onCreate,
+  onEventClick,
 }: CalendarSidebarProps) => {
   const startOfToday = useMemo(() => {
     const today = new Date();
@@ -69,12 +71,12 @@ const CalendarSidebar = ({
         </DropdownMenuContent>
       </DropdownMenu>
 
-      <div className="rounded-2xl border border-[#e0e3eb] bg-white p-4 shadow-sm">
+      <div className="rounded-2xl border border-[#e0e3eb] bg-white shadow-sm p-4">
         <Calendar
           mode="single"
           selected={currentDate}
           onSelect={(date) => date && onSelectDate(date)}
-          className="w-full min-w-0 [&_.rdp-months]:flex [&_.rdp-months]:flex-col"
+          className="w-full min-w-0 p-0 [&_.rdp-months]:flex [&_.rdp-months]:flex-col"
         />
       </div>
 
@@ -90,7 +92,8 @@ const CalendarSidebar = ({
           {upcomingEvents.map((event) => (
             <div
               key={event.id}
-              className="rounded-2xl border border-[#e0e3eb] bg-white px-3 py-2 text-sm shadow-sm"
+              className="rounded-2xl border border-[#e0e3eb] bg-white px-3 py-2 text-sm shadow-sm cursor-pointer hover:bg-[#f1f3f4] transition-colors"
+              onClick={() => onEventClick(event)}
             >
               <div className="flex items-center gap-2 text-[#1a73e8]">
                 <Clock8 className="h-4 w-4" />

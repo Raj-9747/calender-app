@@ -36,13 +36,13 @@ if (!supabaseAnonKey) {
 }
 
 // Log configuration in development (not in production for security)
-if (import.meta.env.DEV) {
-  console.log("Supabase configured:", {
-    url: supabaseUrl,
-    hasKey: !!supabaseAnonKey,
-    keyLength: supabaseAnonKey?.length || 0,
-  });
-}
+// if (import.meta.env.DEV) {
+//   console.log("Supabase configured:", {
+//     url: supabaseUrl,
+//     hasKey: !!supabaseAnonKey,
+//     keyLength: supabaseAnonKey?.length || 0,
+//   });
+// }
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
