@@ -596,6 +596,8 @@ const Index = () => {
             onSelectDate={handleSidebarDateSelect}
             onCreate={handleCreateAction}
             onEventClick={showEventDetails}
+            teamMemberColors={teamMemberColors}
+            isAdmin={isAdmin}
           />
 
           <main className="flex-1 min-w-0 overflow-hidden flex flex-col">

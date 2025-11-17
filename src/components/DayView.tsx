@@ -12,9 +12,9 @@ interface DayViewProps {
 
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
 
-const PIXELS_PER_MINUTE = 2;
-const HOUR_HEIGHT = 60 * PIXELS_PER_MINUTE;      // 120px
-const TOTAL_HEIGHT = 24 * 60 * PIXELS_PER_MINUTE; // 2880px
+const PIXELS_PER_MINUTE = 3;
+const HOUR_HEIGHT = 60 * PIXELS_PER_MINUTE;      // 180px
+const TOTAL_HEIGHT = 24 * 60 * PIXELS_PER_MINUTE; // 4320px
 
 const format12 = (date: Date): string =>
   date.toLocaleTimeString("en-US", {
