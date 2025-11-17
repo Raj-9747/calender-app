@@ -4,6 +4,7 @@ import { Menu, Search, CircleUserRound, LogOut, Calendar as CalendarIcon } from 
 import CalendarHeader from "@/components/CalendarHeader";
 import CalendarGrid from "@/components/CalendarGrid";
 import DayView from "@/components/DayView";
+import UpcomingEventsView from "@/components/UpcomingEventsView";
 import AddEventModal from "@/components/AddEventModal";
 import EventDetailsModal from "@/components/EventDetailsModal";
 import { supabase } from "@/lib/supabaseClient";
@@ -88,7 +89,7 @@ const normalizeEvents = (rows: SupabaseBookingRow[]): CalendarEvent[] =>
 
 const generateId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 
-type ViewMode = "month" | "day";
+type ViewMode = "month" | "day" | "upcoming";
 
 const Index = () => {
   const navigate = useNavigate();
@@ -362,6 +363,10 @@ const Index = () => {
     loadDayViewEvents(selectedDateObj);
   };
 
+  const handleViewUpcomingEvents = () => {
+    setViewMode("upcoming");
+  };
+
   // Load day view events when dayViewDate changes
   useEffect(() => {
     if (viewMode === "day") {
@@ -598,10 +603,11 @@ const Index = () => {
             onEventClick={showEventDetails}
             teamMemberColors={teamMemberColors}
             isAdmin={isAdmin}
+            onViewUpcoming={handleViewUpcomingEvents}
           />
 
           <main className="flex-1 min-w-0 overflow-hidden flex flex-col">
-            {viewMode === "month" ? (
+            {viewMode === "month" && (
               <>
                 <div className="px-4 py-6 sm:px-6 lg:px-10">
                   <CalendarHeader
@@ -622,7 +628,9 @@ const Index = () => {
                   />
                 </div>
               </>
-            ) : (
+            )}
+
+            {viewMode === "day" && (
               <div className="flex-1 flex flex-col">
                 <div className="flex items-center justify-between px-6 py-4 border-b border-[#e0e3eb] bg-white">
                   <div className="flex items-center gap-4">
@@ -684,6 +692,20 @@ const Index = () => {
                   />
                 </div>
               </div>
+            )}
+
+            {viewMode === "upcoming" && (
+              <UpcomingEventsView
+                events={events}
+                isAdmin={isAdmin}
+                teamMemberColors={teamMemberColors}
+                availableTeamMembers={availableTeamMembers}
+                selectedTeamMemberFilter={selectedTeamMemberFilter}
+                onTeamMemberFilterChange={setSelectedTeamMemberFilter}
+                onBackToCalendar={() => setViewMode("month")}
+                onEventClick={showEventDetails}
+                onCreateEvent={() => handleCreateAction("event")}
+              />
             )}
           </main>
         </div>

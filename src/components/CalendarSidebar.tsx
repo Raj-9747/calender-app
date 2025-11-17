@@ -25,6 +25,7 @@ interface CalendarSidebarProps {
   onEventClick: (event: CalendarEvent) => void;
   teamMemberColors?: Map<string, string>;
   isAdmin?: boolean;
+  onViewUpcoming: () => void;
 }
 
 const CalendarSidebar = ({
@@ -37,6 +38,7 @@ const CalendarSidebar = ({
   onEventClick,
   teamMemberColors,
   isAdmin = false,
+  onViewUpcoming,
 }: CalendarSidebarProps) => {
   const startOfToday = useMemo(() => {
     const today = new Date();
@@ -105,58 +107,80 @@ const CalendarSidebar = ({
         scrollbar-hide
       "
     >
-      {/* CREATE BUTTON */}
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button className="h-12 justify-between gap-3 rounded-full bg-[#1a73e8] px-5 text-base font-medium shadow-sm hover:bg-[#155fc8]">
-            <span className="flex items-center gap-3">
-              <Plus className="h-5 w-5" />
-              Create
-            </span>
-          </Button>
-        </DropdownMenuTrigger>
 
-        <DropdownMenuContent
-          align="start"
-          className="w-56 rounded-2xl border border-[#d2d6e3] bg-white p-2 text-sm font-medium text-[#3c4043]"
+      <div className="flex w-full gap-3">
+        
+        {/* VIEW BUTTON (LEFT) */}
+        <Button
+          type="button"
+          variant="outline"
+          onClick={onViewUpcoming}
+          className="
+            w-1/2 h-12 rounded-full border-[#d2d6e3]
+            flex items-center justify-center gap-2
+            text-sm font-medium text-[#1a73e8]
+            hover:bg-[#e8f0fe] hover:text-[#155fc8]
+          "
         >
-          <DropdownMenuItem
-            className="rounded-xl px-3 py-2"
-            onClick={() => onCreate("event")}
+          <CalendarClock className="h-4 w-4" />
+          <span>View</span>
+        </Button>
+
+        {/* CREATE BUTTON (RIGHT) */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              className="
+                w-1/2 h-12 rounded-full bg-[#1a73e8] 
+                text-sm font-medium flex items-center justify-center gap-2
+                shadow-sm hover:bg-[#155fc8]
+              "
+            >
+              <Plus className="h-4 w-4" />
+              <span>Create</span>
+            </Button>
+          </DropdownMenuTrigger>
+
+          <DropdownMenuContent
+            align="start"
+            className="w-56 rounded-2xl border border-[#d2d6e3] bg-white p-2 text-sm font-medium text-[#3c4043]"
           >
-            Event
-          </DropdownMenuItem>
-          <DropdownMenuItem
-            className="rounded-xl px-3 py-2"
-            onClick={() => onCreate("task")}
-          >
-            Task
-          </DropdownMenuItem>
-          <DropdownMenuItem
-            className="rounded-xl px-3 py-2"
-            onClick={() => onCreate("appointment")}
-          >
-            Appointment schedule
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+            <DropdownMenuItem
+              className="rounded-xl px-3 py-2"
+              onClick={() => onCreate("event")}
+            >
+              Event
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              className="rounded-xl px-3 py-2"
+              onClick={() => onCreate("task")}
+            >
+              Task
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              className="rounded-xl px-3 py-2"
+              onClick={() => onCreate("appointment")}
+            >
+              Appointment schedule
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
 
+      </div>
 
-{/* CALENDAR */}
-<div className="p-4">
-  <div className="rounded-2xl border border-[#e0e3eb] bg-white shadow-sm p-4">
-    <div className="[&_*.rdp]:!px-0 [&_*.rdp]:!mx-auto [&_*.rdp-months]:!w-full">
-      <Calendar
-        mode="single"
-        selected={currentDate}
-        onSelect={(date) => date && onSelectDate(date)}
-        className="w-full min-w-0 p-0 [&_.rdp-months]:flex [&_.rdp-months]:flex-col"
-      />
-    </div>
-  </div>
-</div>
-
-
+      {/* CALENDAR */}
+      <div className="p-4">
+        <div className="rounded-2xl border border-[#e0e3eb] bg-white shadow-sm p-4">
+          <div className="[&_*.rdp]:!px-0 [&_*.rdp]:!mx-auto [&_*.rdp-months]:!w-full">
+            <Calendar
+              mode="single"
+              selected={currentDate}
+              onSelect={(date) => date && onSelectDate(date)}
+              className="w-full min-w-0 p-0 [&_.rdp-months]:flex [&_.rdp-months]:flex-col"
+            />
+          </div>
+        </div>
+      </div>
 
       {/* UPCOMING EVENTS */}
       <div>
@@ -172,7 +196,6 @@ const CalendarSidebar = ({
           </p>
         </div>
 
-        {/* SCROLLABLE LIST WITH HIDDEN SCROLLBAR */}
         <div className="max-h-[350px] overflow-y-auto space-y-4 pr-2 pb-4 scrollbar-hide">
           {upcomingEvents.length === 0 && (
             <p className="text-sm text-[#5f6368]">
@@ -249,7 +272,9 @@ const CalendarSidebar = ({
               </div>
               <p className="mt-1 font-medium text-[#202124]">{task.title}</p>
               {task.notes && (
-                <p className="text-xs text-[#5f6368] line-clamp-2">{task.notes}</p>
+                <p className="text-xs text-[#5f6368] line-clamp-2">
+                  {task.notes}
+                </p>
               )}
             </div>
           ))}
@@ -293,7 +318,9 @@ const CalendarSidebar = ({
               </p>
 
               {appointment.location && (
-                <p className="text-xs text-[#5f6368]">{appointment.location}</p>
+                <p className="text-xs text-[#5f6368]">
+                  {appointment.location}
+                </p>
               )}
 
               {appointment.notes && (
