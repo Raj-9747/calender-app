@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { Plus, Clock8, ListChecks, CalendarClock } from "lucide-react";
+import { Plus, Clock8, ListChecks, CalendarClock, X } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import { Button } from "@/components/ui/button";
 import {
@@ -26,6 +26,10 @@ interface CalendarSidebarProps {
   teamMemberColors?: Map<string, string>;
   isAdmin?: boolean;
   onViewUpcoming: () => void;
+  isOpen: boolean;
+  onClose: () => void;
+  isDesktop?: boolean;
+  isCollapsed?: boolean;
 }
 
 const CalendarSidebar = ({
@@ -39,6 +43,10 @@ const CalendarSidebar = ({
   teamMemberColors,
   isAdmin = false,
   onViewUpcoming,
+  isOpen,
+  onClose,
+  isDesktop = false,
+  isCollapsed = false,
 }: CalendarSidebarProps) => {
   const startOfToday = useMemo(() => {
     const today = new Date();
@@ -94,21 +102,47 @@ const CalendarSidebar = ({
     return "#1a73e8";
   };
 
+  const showCollapsedShell = isDesktop && isCollapsed;
+  const baseClasses = cn(
+    "flex shrink-0 flex-col gap-6 bg-white/95 overflow-y-auto scrollbar-hide transition-all duration-300 ease-in-out border-r border-[#e0e3eb]",
+    isDesktop
+      ? cn("relative z-auto shadow-none", showCollapsedShell ? "w-16 px-3 py-4" : "w-96 px-6 py-6")
+      : cn(
+          "fixed inset-y-0 left-0 z-50 w-80 sm:w-96 px-6 py-6 shadow-xl transform",
+          isOpen ? "translate-x-0" : "-translate-x-full"
+        )
+  );
+
   return (
     <aside
-      className="
-        hidden lg:flex 
-        w-96 shrink-0 
-        flex-col gap-6 
-        border-r border-[#e0e3eb] 
-        bg-white/95 
-        px-6 py-6 
-        overflow-y-auto 
-        scrollbar-hide
-      "
+      id="calendar-sidebar"
+      role={isDesktop ? undefined : "dialog"}
+      aria-modal={isDesktop ? undefined : true}
+      className={baseClasses}
     >
+      {!isDesktop && (
+        <div className="flex items-center justify-between lg:hidden">
+        <span className="text-base font-semibold text-[#202124]">Navigation</span>
+        <button
+          type="button"
+          onClick={onClose}
+          className="rounded-full p-2 text-[#5f6368] hover:bg-[#f1f3f4]"
+          aria-label="Close sidebar"
+        >
+          <X className="h-5 w-5" />
+        </button>
+        </div>
+      )}
 
-      <div className="flex w-full gap-3">
+      {showCollapsedShell ? (
+        <div className="hidden w-full flex-1 items-center justify-center lg:flex">
+          <span className="rotate-90 text-sm font-semibold tracking-widest text-[#1a73e8]">
+            Calendar
+          </span>
+        </div>
+      ) : (
+        <>
+          <div className="flex w-full gap-3">
         
         {/* VIEW BUTTON (LEFT) */}
         <Button
@@ -333,18 +367,20 @@ const CalendarSidebar = ({
         </div>
       </div>
 
-      {/* FOOTER */}
-      <div className="mt-auto rounded-2xl border border-dashed border-[#d2d6e3] bg-[#f6f8fc] p-4 text-sm text-[#5f6368]">
-        Stay organized by keeping your events in sync.
-        <Button
-          variant="link"
-          className={cn(
-            "mt-1 h-auto px-0 text-sm font-semibold text-[#1a73e8] hover:text-[#155fc8] focus-visible:ring-0"
-          )}
-        >
-          Learn more
-        </Button>
-      </div>
+          {/* FOOTER */}
+          <div className="mt-auto rounded-2xl border border-dashed border-[#d2d6e3] bg-[#f6f8fc] p-4 text-sm text-[#5f6368]">
+            Stay organized by keeping your events in sync.
+            <Button
+              variant="link"
+              className={cn(
+                "mt-1 h-auto px-0 text-sm font-semibold text-[#1a73e8] hover:text-[#155fc8] focus-visible:ring-0"
+              )}
+            >
+              Learn more
+            </Button>
+          </div>
+        </>
+      )}
     </aside>
   );
 };
