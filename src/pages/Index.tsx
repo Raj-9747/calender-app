@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { Menu, Search, CircleUserRound, LogOut, Calendar as CalendarIcon } from "lucide-react";
+import { Menu, Search, CircleUserRound, LogOut, Calendar as CalendarIcon, X } from "lucide-react";
 import CalendarHeader from "@/components/CalendarHeader";
 import CalendarGrid from "@/components/CalendarGrid";
 import DayView from "@/components/DayView";
@@ -131,11 +131,50 @@ const Index = () => {
   const [teamMember, setTeamMember] = useState<string | null>(null);
   const [selectedTeamMemberFilter, setSelectedTeamMemberFilter] = useState<string | null>(null);
   const [availableTeamMembers, setAvailableTeamMembers] = useState<string[]>([]);
+  const [isDesktopViewport, setIsDesktopViewport] = useState<boolean>(() => {
+    if (typeof window === "undefined") return true;
+    return window.matchMedia("(min-width: 1024px)").matches;
+  });
+  const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(() => {
+    if (typeof window === "undefined") return true;
+    return window.matchMedia("(min-width: 1024px)").matches;
+  });
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
   // Load team member from localStorage on mount
   useEffect(() => {
     const storedTeamMember = localStorage.getItem("team_member");
     setTeamMember(storedTeamMember);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const mediaQuery = window.matchMedia("(min-width: 1024px)");
+
+    const handleViewportChange = (matches: boolean) => {
+      setIsDesktopViewport(matches);
+      if (matches) {
+        setIsSidebarOpen(true);
+        setIsSidebarCollapsed(false);
+      } else {
+        setIsSidebarOpen(false);
+      }
+    };
+
+    handleViewportChange(mediaQuery.matches);
+
+    const listener = (event: MediaQueryListEvent) => {
+      handleViewportChange(event.matches);
+    };
+
+    if (typeof mediaQuery.addEventListener === "function") {
+      mediaQuery.addEventListener("change", listener);
+      return () => mediaQuery.removeEventListener("change", listener);
+    }
+
+    mediaQuery.addListener(listener);
+    return () => mediaQuery.removeListener(listener);
   }, []);
 
   // Check if user is admin
@@ -373,6 +412,19 @@ const Index = () => {
     setIsAppointmentModalOpen(true);
   };
 
+  const toggleSidebar = () => {
+    if (isDesktopViewport) {
+      setIsSidebarCollapsed((prev) => !prev);
+      return;
+    }
+    setIsSidebarOpen((prev) => !prev);
+  };
+
+  const closeSidebar = () => {
+    if (isDesktopViewport) return;
+    setIsSidebarOpen(false);
+  };
+
   const handleDateClick = (date: Date) => {
     openAppointmentModal(date);
   };
@@ -573,9 +625,16 @@ const Index = () => {
             <button
               type="button"
               className="rounded-full p-2 text-[#5f6368] hover:bg-[#f1f3f4]"
-              aria-label="Open navigation"
+              aria-label="Toggle navigation sidebar"
+              onClick={toggleSidebar}
+              aria-expanded={isDesktopViewport ? true : isSidebarOpen}
+              aria-controls="calendar-sidebar"
             >
-              <Menu className="h-5 w-5" />
+              {!isDesktopViewport && isSidebarOpen ? (
+                <X className="h-5 w-5" />
+              ) : (
+                <Menu className="h-5 w-5" />
+              )}
             </button>
             <div className="flex items-center gap-2">
               <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-[#d2d6e3] bg-white text-lg font-semibold text-[#1a73e8]">
@@ -640,6 +699,14 @@ const Index = () => {
         </header>
 
         <div className="flex flex-1 overflow-hidden">
+          {!isDesktopViewport && (
+            <div
+              className={`fixed inset-0 z-40 bg-black/40 transition-opacity duration-300 ease-in-out lg:hidden ${
+                isSidebarOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
+              }`}
+              onClick={closeSidebar}
+            />
+          )}
           <CalendarSidebar
             currentDate={currentDate}
             events={events}
@@ -651,6 +718,10 @@ const Index = () => {
             teamMemberColors={teamMemberColors}
             isAdmin={isAdmin}
             onViewUpcoming={handleViewUpcomingEvents}
+            isOpen={isDesktopViewport ? true : isSidebarOpen}
+            onClose={closeSidebar}
+            isDesktop={isDesktopViewport}
+            isCollapsed={isDesktopViewport ? isSidebarCollapsed : false}
           />
 
           <main className="flex-1 min-w-0 overflow-hidden flex flex-col">
