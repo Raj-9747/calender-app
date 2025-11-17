@@ -2,14 +2,29 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { X } from "lucide-react";
 
 interface AddEventModalProps {
   isOpen: boolean;
   selectedDate: Date | null;
   onClose: () => void;
-  onAddEvent: (title: string, description: string, meetingLink?: string) => Promise<void>;
+  onAddEvent: (
+    title: string,
+    description: string,
+    meetingLink?: string,
+    assignedTeamMember?: string
+  ) => Promise<void>;
   isSaving: boolean;
+  isAdmin: boolean;
+  teamMembers: string[];
+  initialTeamMember?: string | null;
 }
 
 const AddEventModal = ({
@@ -18,18 +33,28 @@ const AddEventModal = ({
   onClose,
   onAddEvent,
   isSaving,
+  isAdmin,
+  teamMembers,
+  initialTeamMember,
 }: AddEventModalProps) => {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [meetingLink, setMeetingLink] = useState("");
+  const [selectedTeamMember, setSelectedTeamMember] = useState("");
 
   useEffect(() => {
     if (!isOpen) {
       setTitle("");
       setDescription("");
       setMeetingLink("");
+      setSelectedTeamMember("");
+      return;
     }
-  }, [isOpen]);
+
+    if (isAdmin) {
+      setSelectedTeamMember(initialTeamMember ?? "");
+    }
+  }, [isOpen, isAdmin, initialTeamMember]);
 
   const formatDateDisplay = (date: Date | null): string => {
     if (!date) return "No date selected";
@@ -45,7 +70,13 @@ const AddEventModal = ({
 
   const handleSubmit = async () => {
     if (!title.trim() || isSaving) return;
-    await onAddEvent(title, description, meetingLink);
+    if (isAdmin && !selectedTeamMember) return;
+    await onAddEvent(
+      title,
+      description,
+      meetingLink,
+      isAdmin ? selectedTeamMember : undefined
+    );
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -138,6 +169,30 @@ const AddEventModal = ({
               onKeyPress={handleKeyPress}
             />
           </div>
+
+          {isAdmin && (
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-2">
+                Select Team Member
+              </label>
+              <Select
+                value={selectedTeamMember || undefined}
+                onValueChange={(value) => setSelectedTeamMember(value)}
+                disabled={teamMembers.length === 0}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Choose team member" />
+                </SelectTrigger>
+                <SelectContent>
+                  {teamMembers.map((member) => (
+                    <SelectItem key={member} value={member}>
+                      {member}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
         </div>
 
         {/* Action Buttons */}
@@ -148,7 +203,9 @@ const AddEventModal = ({
           <Button
             className="bg-primary hover:bg-primary/90"
             onClick={handleSubmit}
-            disabled={!title.trim() || isSaving}
+            disabled={
+              !title.trim() || isSaving || (isAdmin && !selectedTeamMember)
+            }
           >
             {isSaving ? "Saving..." : "Save Event"}
           </Button>

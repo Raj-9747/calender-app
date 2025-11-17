@@ -387,7 +387,13 @@ const Index = () => {
   };
 
   const saveEvent = useCallback(
-    async (title: string, description: string, date: string, meetingLink?: string): Promise<CalendarEvent | null> => {
+    async (
+      title: string,
+      description: string,
+      date: string,
+      meetingLink?: string,
+      assignedTeamMember?: string
+    ): Promise<CalendarEvent | null> => {
       // Convert empty string to null to avoid unique constraint violations
       const meetingLinkRaw = meetingLink?.trim() ?? "";
       const meetingLinkValue = meetingLinkRaw === "" ? null : meetingLinkRaw;
@@ -397,10 +403,22 @@ const Index = () => {
       const bookingTime = `${date}T00:00:00Z`;
 
       // Get team member from localStorage
-      const teamMember = localStorage.getItem("team_member");
-      if (!teamMember) {
+      const storedTeamMember = localStorage.getItem("team_member");
+      if (!storedTeamMember) {
         toast.error("Authentication error", {
           description: "Please log in again.",
+        });
+        return null;
+      }
+
+      const effectiveTeamMember =
+        storedTeamMember.toLowerCase() === "admin" && assignedTeamMember
+          ? assignedTeamMember
+          : storedTeamMember;
+
+      if (!effectiveTeamMember) {
+        toast.error("Missing team member", {
+          description: "Please select a team member for this event.",
         });
         return null;
       }
@@ -415,7 +433,7 @@ const Index = () => {
             summary: description, 
             booking_time: bookingTime, 
             meet_link: meetingLinkValue,
-            team_member: teamMember
+            team_member: effectiveTeamMember
           })
           .select()
           .single();
@@ -469,7 +487,12 @@ const Index = () => {
     []
   );
 
-  const handleAddEvent = async (title: string, description: string, meetingLink?: string) => {
+  const handleAddEvent = async (
+    title: string,
+    description: string,
+    meetingLink?: string,
+    assignedTeamMember?: string
+  ) => {
     if (!selectedDate) {
       toast.error("No date selected", {
         description: "Please select a date for the event.",
@@ -477,7 +500,13 @@ const Index = () => {
       return;
     }
     const dateString = formatDate(selectedDate);
-    const newEvent = await saveEvent(title, description, dateString, meetingLink);
+    const newEvent = await saveEvent(
+      title,
+      description,
+      dateString,
+      meetingLink,
+      assignedTeamMember
+    );
     if (newEvent) {
       setIsAddModalOpen(false);
       setSelectedDate(null);
@@ -720,6 +749,9 @@ const Index = () => {
         }}
         onAddEvent={handleAddEvent}
         isSaving={isSavingEvent}
+        isAdmin={isAdmin}
+        teamMembers={availableTeamMembers}
+        initialTeamMember={selectedTeamMemberFilter}
       />
 
       <AddTaskModal
