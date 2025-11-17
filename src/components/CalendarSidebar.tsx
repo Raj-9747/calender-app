@@ -147,12 +147,6 @@ const CalendarSidebar = ({
           >
             <DropdownMenuItem
               className="rounded-xl px-3 py-2"
-              onClick={() => onCreate("event")}
-            >
-              Event
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              className="rounded-xl px-3 py-2"
               onClick={() => onCreate("task")}
             >
               Task
@@ -311,21 +305,27 @@ const CalendarSidebar = ({
               </div>
 
               <p className="mt-1 font-medium text-[#202124]">
-                {appointment.title}
+                {appointment.serviceType}
               </p>
               <p className="text-xs text-[#5f6368]">
                 {appointment.time} • {appointment.duration} mins
               </p>
 
-              {appointment.location && (
+              {appointment.customerName && (
                 <p className="text-xs text-[#5f6368]">
-                  {appointment.location}
+                  Client: {appointment.customerName}
                 </p>
               )}
 
-              {appointment.notes && (
+              {appointment.meetingLink && (
+                <p className="text-xs text-[#5f6368] line-clamp-1">
+                  {appointment.meetingLink}
+                </p>
+              )}
+
+              {appointment.description && (
                 <p className="text-xs text-[#5f6368] line-clamp-2">
-                  {appointment.notes}
+                  {appointment.description}
                 </p>
               )}
             </div>

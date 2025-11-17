@@ -5,11 +5,9 @@ import CalendarHeader from "@/components/CalendarHeader";
 import CalendarGrid from "@/components/CalendarGrid";
 import DayView from "@/components/DayView";
 import UpcomingEventsView from "@/components/UpcomingEventsView";
-import AddEventModal from "@/components/AddEventModal";
 import EventDetailsModal from "@/components/EventDetailsModal";
 import { supabase } from "@/lib/supabaseClient";
 import CalendarSidebar from "@/components/CalendarSidebar";
-import { Input } from "@/components/ui/input";
 import AddTaskModal from "@/components/AddTaskModal";
 import AppointmentScheduleModal from "@/components/AppointmentScheduleModal";
 import { toast } from "sonner";
@@ -27,6 +25,9 @@ export interface CalendarEvent {
   startTime?: string; // ISO timestamp
   endTime?: string; // ISO timestamp
   bookingTime?: string; // Original booking_time from database
+  customerName?: string | null;
+  customerEmail?: string | null;
+  phoneNumber?: string | null;
 }
 
 export interface TaskItem {
@@ -38,13 +39,28 @@ export interface TaskItem {
 
 export interface AppointmentSchedule {
   id: string;
-  title: string;
+  serviceType: string;
   date: string;
   time: string;
   duration: string;
-  location: string;
-  notes: string;
+  meetingLink: string;
+  description: string;
+  customerName: string;
+  customerEmail: string;
 }
+
+type AppointmentFormValues = {
+  serviceType: string;
+  customerName: string;
+  customerEmail: string;
+  phoneNumber: string;
+  date: string;
+  time: string;
+  duration: string;
+  meetingLink: string;
+  description: string;
+  teamMember?: string;
+};
 
 type SupabaseBookingRow = {
   id: string;
@@ -54,6 +70,9 @@ type SupabaseBookingRow = {
   meet_link: string | null;
   team_member: string | null;
   duration: number | null;
+  customer_name: string | null;
+  customer_email: string | null;
+  phone_number: string | null;
 };
 
 const normalizeEvents = (rows: SupabaseBookingRow[]): CalendarEvent[] =>
@@ -84,6 +103,9 @@ const normalizeEvents = (rows: SupabaseBookingRow[]): CalendarEvent[] =>
       startTime: startTime,
       endTime: endTime,
       bookingTime: row.booking_time,
+      customerName: row.customer_name,
+      customerEmail: row.customer_email,
+      phoneNumber: row.phone_number,
     };
   });
 
@@ -99,10 +121,9 @@ const Index = () => {
   const [dayViewDate, setDayViewDate] = useState<Date>(new Date());
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [dayViewEvents, setDayViewEvents] = useState<CalendarEvent[]>([]);
-  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
-  const [isSavingEvent, setIsSavingEvent] = useState(false);
+  const [isSavingAppointment, setIsSavingAppointment] = useState(false);
   const [tasks, setTasks] = useState<TaskItem[]>([]);
   const [appointments, setAppointments] = useState<AppointmentSchedule[]>([]);
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
@@ -237,7 +258,7 @@ const Index = () => {
     // Build query based on role
     let query = supabase
       .from("bookings")
-      .select("id, product_name, summary, booking_time, meet_link, team_member, duration");
+      .select("id, product_name, summary, booking_time, meet_link, team_member, duration, customer_name, customer_email, phone_number");
 
     // If admin and a specific team member is selected, filter by that member
     if (teamMember.toLowerCase() === "admin" && selectedTeamMemberFilter) {
@@ -288,7 +309,7 @@ const Index = () => {
       // Build query - filter by date
       let query = supabase
         .from("bookings")
-        .select("id, product_name, summary, booking_time, meet_link, team_member, duration")
+        .select("id, product_name, summary, booking_time, meet_link, team_member, duration, customer_name, customer_email, phone_number")
         .gte("booking_time", `${dateStr}T00:00:00Z`)
         .lt("booking_time", `${dateStr}T23:59:59Z`);
 
@@ -346,13 +367,14 @@ const Index = () => {
     setCurrentDate(new Date(today.getFullYear(), today.getMonth(), today.getDate()));
   };
 
-  const openEventModal = (date: Date) => {
-    setSelectedDate(date);
-    setIsAddModalOpen(true);
+  const openAppointmentModal = (date?: Date) => {
+    const effectiveDate = date ?? currentDate;
+    setSelectedDate(effectiveDate);
+    setIsAppointmentModalOpen(true);
   };
 
   const handleDateClick = (date: Date) => {
-    openEventModal(date);
+    openAppointmentModal(date);
   };
 
   const handleSidebarDateSelect = (date: Date) => {
@@ -375,8 +397,8 @@ const Index = () => {
   }, [dayViewDate, viewMode, loadDayViewEvents]);
 
   const handleCreateAction = (type: "event" | "task" | "appointment") => {
-    if (type === "event") {
-      openEventModal(currentDate);
+    if (type === "event" || type === "appointment") {
+      openAppointmentModal(currentDate);
       return;
     }
     if (type === "task") {
@@ -384,134 +406,6 @@ const Index = () => {
       return;
     }
     setIsAppointmentModalOpen(true);
-  };
-
-  const saveEvent = useCallback(
-    async (
-      title: string,
-      description: string,
-      date: string,
-      meetingLink?: string,
-      assignedTeamMember?: string
-    ): Promise<CalendarEvent | null> => {
-      // Convert empty string to null to avoid unique constraint violations
-      const meetingLinkRaw = meetingLink?.trim() ?? "";
-      const meetingLinkValue = meetingLinkRaw === "" ? null : meetingLinkRaw;
-
-      // Convert date string (YYYY-MM-DD) to TIMESTAMPTZ format
-      // Append time 00:00:00 and timezone to make it a proper timestamp
-      const bookingTime = `${date}T00:00:00Z`;
-
-      // Get team member from localStorage
-      const storedTeamMember = localStorage.getItem("team_member");
-      if (!storedTeamMember) {
-        toast.error("Authentication error", {
-          description: "Please log in again.",
-        });
-        return null;
-      }
-
-      const effectiveTeamMember =
-        storedTeamMember.toLowerCase() === "admin" && assignedTeamMember
-          ? assignedTeamMember
-          : storedTeamMember;
-
-      if (!effectiveTeamMember) {
-        toast.error("Missing team member", {
-          description: "Please select a team member for this event.",
-        });
-        return null;
-      }
-
-      setIsSavingEvent(true);
-      
-      try {
-        const { data, error } = await supabase
-          .from("bookings")
-          .insert({ 
-            product_name: title, 
-            summary: description, 
-            booking_time: bookingTime, 
-            meet_link: meetingLinkValue,
-            team_member: effectiveTeamMember
-          })
-          .select()
-          .single();
-
-        setIsSavingEvent(false);
-
-        if (error) {
-          console.error("Failed to save event:", error);
-          
-          // Provide user-friendly error messages
-          let errorMessage = "Failed to save event. ";
-          if (error.code === "42501" || error.message.includes("permission") || error.message.includes("policy")) {
-            errorMessage += "Permission denied. Please check your Supabase Row Level Security (RLS) policies.";
-          } else if (error.code === "PGRST116" || error.message.includes("JWT")) {
-            errorMessage += "Authentication error. Please check your Supabase credentials.";
-          } else if (error.message.includes("network") || error.message.includes("fetch")) {
-            errorMessage += "Network error. Please check your internet connection.";
-          } else if (error.code === "23505" || error.message.includes("duplicate key") || error.message.includes("unique constraint")) {
-            errorMessage += "This meeting link is already in use. Please use a different link or leave it empty.";
-          } else {
-            errorMessage += error.message || "Unknown error occurred.";
-          }
-          
-          toast.error("Error Saving Event", {
-            description: errorMessage,
-            duration: 5000,
-          });
-          return null;
-        }
-
-        if (!data) {
-          toast.error("Error Saving Event", {
-            description: "No data returned from server.",
-          });
-          return null;
-        }
-
-        const normalized = normalizeEvents([data as SupabaseBookingRow])[0];
-        setEvents((prev) => [...prev, normalized]);
-        toast.success("Event saved successfully!");
-        return normalized;
-      } catch (err) {
-        setIsSavingEvent(false);
-        console.error("Unexpected error saving event:", err);
-        toast.error("Error Saving Event", {
-          description: err instanceof Error ? err.message : "An unexpected error occurred.",
-        });
-        return null;
-      }
-    },
-    []
-  );
-
-  const handleAddEvent = async (
-    title: string,
-    description: string,
-    meetingLink?: string,
-    assignedTeamMember?: string
-  ) => {
-    if (!selectedDate) {
-      toast.error("No date selected", {
-        description: "Please select a date for the event.",
-      });
-      return;
-    }
-    const dateString = formatDate(selectedDate);
-    const newEvent = await saveEvent(
-      title,
-      description,
-      dateString,
-      meetingLink,
-      assignedTeamMember
-    );
-    if (newEvent) {
-      setIsAddModalOpen(false);
-      setSelectedDate(null);
-    }
-    // Error handling is done in saveEvent, so we don't need to show another error here
   };
 
   const renderEvents = useCallback(
@@ -532,20 +426,144 @@ const Index = () => {
     setIsTaskModalOpen(false);
   };
 
-  const handleAddAppointment = (
-    title: string,
-    date: string,
-    time: string,
-    duration: string,
-    location: string,
-    notes: string
-  ) => {
-    setAppointments((prev) => [
-      ...prev,
-      { id: generateId(), title, date, time, duration, location, notes },
-    ]);
-    setIsAppointmentModalOpen(false);
-  };
+  const handleAddAppointment = useCallback(
+    async (values: AppointmentFormValues): Promise<void> => {
+      if (!values.date || !values.time) {
+        toast.error("Missing booking details", {
+          description: "Please choose both a booking date and time.",
+        });
+        return;
+      }
+
+      const bookingDateTime = new Date(`${values.date}T${values.time}`);
+      if (Number.isNaN(bookingDateTime.getTime())) {
+        toast.error("Invalid booking time", {
+          description: "Please provide a valid date and time.",
+        });
+        return;
+      }
+
+      const formatTimestamp = (date: Date) => {
+        const iso = date.toISOString(); // 2025-11-14T18:11:06.115Z
+        const [datePart, timePart] = iso.split("T");
+        return `${datePart} ${timePart.replace("Z", "+00")}`;
+      };
+
+      const storedTeamMember = localStorage.getItem("team_member");
+      if (!storedTeamMember) {
+        toast.error("Authentication error", {
+          description: "Please log in again.",
+        });
+        return;
+      }
+
+      const normalizedTeamMember =
+        storedTeamMember.toLowerCase() === "admin"
+          ? values.teamMember ?? ""
+          : storedTeamMember;
+
+      if (!normalizedTeamMember.trim()) {
+        toast.error("Select team member", {
+          description: "Please choose which team member owns this appointment.",
+        });
+        return;
+      }
+
+      const durationValue = Number.parseInt(values.duration, 10);
+      const durationMinutes =
+        Number.isNaN(durationValue) || durationValue <= 0 ? 60 : durationValue;
+
+      const meetingLinkValue = values.meetingLink.trim();
+      const sanitizedMeetingLink = meetingLinkValue === "" ? null : meetingLinkValue;
+
+      const serviceTypeValue = values.serviceType.trim();
+
+      setIsSavingAppointment(true);
+
+      try {
+        const { data, error } = await supabase
+          .from("bookings")
+          .insert({
+            product_name: serviceTypeValue || null,
+            summary: values.description.trim() || null,
+            booking_time: formatTimestamp(bookingDateTime),
+            meet_link: sanitizedMeetingLink,
+            team_member: normalizedTeamMember,
+            duration: durationMinutes,
+            customer_name: values.customerName.trim() || null,
+            customer_email: values.customerEmail.trim() || null,
+            phone_number: values.phoneNumber.trim() || null,
+          })
+          .select()
+          .single();
+
+        setIsSavingAppointment(false);
+
+        if (error) {
+          console.error("Failed to schedule appointment:", error);
+          let message = "Failed to schedule appointment. ";
+          if (error.code === "42501" || error.message.includes("permission")) {
+            message += "Permission denied. Please review Supabase policies.";
+          } else if (error.code === "23505" || error.message.includes("duplicate")) {
+            message += "This meeting link is already in use. Please provide a unique link.";
+          } else if (error.message.includes("JWT")) {
+            message += "Authentication expired. Please log in again.";
+          } else if (error.message.toLowerCase().includes("network")) {
+            message += "Network error. Please check your connection.";
+          } else {
+            message += error.message || "Unknown error occurred.";
+          }
+
+          toast.error("Error Saving Appointment", {
+            description: message,
+            duration: 5000,
+          });
+          return;
+        }
+
+        if (!data) {
+          toast.error("Error Saving Appointment", {
+            description: "No data returned from server.",
+          });
+          return;
+        }
+
+        const normalized = normalizeEvents([data as SupabaseBookingRow])[0];
+        setEvents((prev) => [...prev, normalized]);
+
+        if (viewMode === "day") {
+          await loadDayViewEvents(dayViewDate);
+        }
+
+        toast.success("Appointment scheduled successfully!");
+
+        setAppointments((prev) => [
+          ...prev,
+          {
+            id: generateId(),
+            serviceType: serviceTypeValue,
+            date: values.date,
+            time: values.time,
+            duration: `${durationMinutes}`,
+            meetingLink: values.meetingLink,
+            description: values.description,
+            customerName: values.customerName,
+            customerEmail: values.customerEmail,
+          },
+        ]);
+
+        setIsAppointmentModalOpen(false);
+        setSelectedDate(null);
+      } catch (err) {
+        setIsSavingAppointment(false);
+        console.error("Unexpected error scheduling appointment:", err);
+        toast.error("Error Saving Appointment", {
+          description: err instanceof Error ? err.message : "An unexpected error occurred.",
+        });
+      }
+    },
+    [dayViewDate, loadDayViewEvents, viewMode]
+  );
 
   return (
     <div className="min-h-screen bg-[#f6f8fc]">
@@ -740,20 +758,6 @@ const Index = () => {
         </div>
       </div>
 
-      <AddEventModal
-        isOpen={isAddModalOpen}
-        selectedDate={selectedDate}
-        onClose={() => {
-          setIsAddModalOpen(false);
-          setSelectedDate(null);
-        }}
-        onAddEvent={handleAddEvent}
-        isSaving={isSavingEvent}
-        isAdmin={isAdmin}
-        teamMembers={availableTeamMembers}
-        initialTeamMember={selectedTeamMemberFilter}
-      />
-
       <AddTaskModal
         isOpen={isTaskModalOpen}
         selectedDate={currentDate}
@@ -763,9 +767,16 @@ const Index = () => {
 
       <AppointmentScheduleModal
         isOpen={isAppointmentModalOpen}
-        selectedDate={currentDate}
-        onClose={() => setIsAppointmentModalOpen(false)}
+        selectedDate={selectedDate ?? currentDate}
+        onClose={() => {
+          setIsAppointmentModalOpen(false);
+          setSelectedDate(null);
+        }}
         onAddAppointment={handleAddAppointment}
+        isSaving={isSavingAppointment}
+        isAdmin={isAdmin}
+        teamMembers={availableTeamMembers}
+        initialTeamMember={selectedTeamMemberFilter}
       />
 
       <EventDetailsModal
