@@ -31,6 +31,16 @@ const EventDetailsModal = ({ isOpen, event, onClose }: EventDetailsModalProps) =
     });
   };
 
+  const getPaymentStatusClasses = (status?: string | null) => {
+    if (!status) return "hidden";
+    const s = status.toLowerCase();
+    if (s === "paid") return "inline-flex items-center rounded-full px-2 py-1 text-xs font-medium bg-green-100 text-green-800";
+    if (s === "pending") return "inline-flex items-center rounded-full px-2 py-1 text-xs font-medium bg-yellow-100 text-yellow-800";
+    if (s === "unpaid" || s === "failed") return "inline-flex items-center rounded-full px-2 py-1 text-xs font-medium bg-red-100 text-red-800";
+    if (s === "refunded") return "inline-flex items-center rounded-full px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800";
+    return "inline-flex items-center rounded-full px-2 py-1 text-xs font-medium bg-gray-100 text-gray-800";
+  };
+
   if (!isOpen || !event) return null;
 
   // Format times in 12-hour format for display
@@ -54,9 +64,16 @@ const EventDetailsModal = ({ isOpen, event, onClose }: EventDetailsModalProps) =
             <h2 id="detailTitle" className="text-2xl font-semibold text-foreground mb-1">
               {event.title}
             </h2>
-            <p id="detailDate" className="text-sm text-muted-foreground">
-              {formatDateDisplay(event.date)}
-            </p>
+            <div className="flex items-center gap-3">
+              <p id="detailDate" className="text-sm text-muted-foreground">
+                {formatDateDisplay(event.date)}
+              </p>
+              {event.paymentStatus && (
+                <span className={getPaymentStatusClasses(event.paymentStatus)}>
+                  {`${event.paymentStatus.charAt(0).toUpperCase()}${event.paymentStatus.slice(1)}`}
+                </span>
+              )}
+            </div>
           </div>
           <button
             className="text-muted-foreground hover:text-foreground transition-colors"

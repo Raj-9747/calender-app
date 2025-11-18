@@ -28,6 +28,7 @@ export interface CalendarEvent {
   customerName?: string | null;
   customerEmail?: string | null;
   phoneNumber?: string | null;
+  paymentStatus?: string | null;
 }
 
 export interface TaskItem {
@@ -73,6 +74,7 @@ type SupabaseBookingRow = {
   customer_name: string | null;
   customer_email: string | null;
   phone_number: string | null;
+  payment_status: string | null;
 };
 
 const normalizeEvents = (rows: SupabaseBookingRow[]): CalendarEvent[] =>
@@ -106,6 +108,7 @@ const normalizeEvents = (rows: SupabaseBookingRow[]): CalendarEvent[] =>
       customerName: row.customer_name,
       customerEmail: row.customer_email,
       phoneNumber: row.phone_number,
+      paymentStatus: row.payment_status ?? null,
     };
   });
 
@@ -297,7 +300,7 @@ const Index = () => {
     // Build query based on role
     let query = supabase
       .from("bookings")
-      .select("id, product_name, summary, booking_time, meet_link, team_member, duration, customer_name, customer_email, phone_number");
+      .select("id, product_name, summary, booking_time, meet_link, team_member, duration, customer_name, customer_email, phone_number, payment_status");
 
     // If admin and a specific team member is selected, filter by that member
     if (teamMember.toLowerCase() === "admin" && selectedTeamMemberFilter) {
@@ -348,7 +351,7 @@ const Index = () => {
       // Build query - filter by date
       let query = supabase
         .from("bookings")
-        .select("id, product_name, summary, booking_time, meet_link, team_member, duration, customer_name, customer_email, phone_number")
+        .select("id, product_name, summary, booking_time, meet_link, team_member, duration, customer_name, customer_email, phone_number, payment_status")
         .gte("booking_time", `${dateStr}T00:00:00Z`)
         .lt("booking_time", `${dateStr}T23:59:59Z`);
 
