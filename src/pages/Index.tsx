@@ -24,7 +24,8 @@ export interface CalendarEvent {
   duration?: number; // Duration in minutes
   startTime?: string; // ISO timestamp
   endTime?: string; // ISO timestamp
-  bookingTime?: string; // Original booking_time from database
+  bookingTime?: string; // Display-adjusted booking time (ISO)
+  originalBookingTime?: string; // Raw booking_time from database
   customerName?: string | null;
   customerEmail?: string | null;
   phoneNumber?: string | null;
@@ -77,21 +78,34 @@ type SupabaseBookingRow = {
   payment_status: string | null;
 };
 
+const DISPLAY_TIME_OFFSET_HOURS = 5;
+const DISPLAY_TIME_OFFSET_MS = DISPLAY_TIME_OFFSET_HOURS * 60 * 60 * 1000;
+const DAY_IN_MS = 24 * 60 * 60 * 1000;
+
+const shiftBookingTime = (isoString?: string): Date | null => {
+  if (!isoString) return null;
+  const parsed = new Date(isoString);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return new Date(parsed.getTime() - DISPLAY_TIME_OFFSET_MS);
+};
+
 const normalizeEvents = (rows: SupabaseBookingRow[]): CalendarEvent[] =>
   rows.map((row) => {
-    // Extract date from booking_time (TIMESTAMPTZ format)
-    const bookingDate = row.booking_time ? new Date(row.booking_time) : new Date();
+    const adjustedStartDate = shiftBookingTime(row.booking_time);
+    const fallbackDate =
+      adjustedStartDate ??
+      (row.booking_time ? new Date(row.booking_time) : new Date());
     // Format date as YYYY-MM-DD
-    const year = bookingDate.getFullYear();
-    const month = String(bookingDate.getMonth() + 1).padStart(2, "0");
-    const day = String(bookingDate.getDate()).padStart(2, "0");
+    const year = fallbackDate.getFullYear();
+    const month = String(fallbackDate.getMonth() + 1).padStart(2, "0");
+    const day = String(fallbackDate.getDate()).padStart(2, "0");
     const dateStr = `${year}-${month}-${day}`;
     
     // Calculate start and end times
-    const startTime = row.booking_time;
     const duration = row.duration ?? 60; // Default to 60 minutes if not provided
-    const endTime = startTime
-      ? new Date(new Date(startTime).getTime() + duration * 60000).toISOString()
+    const startTimeISO = adjustedStartDate?.toISOString();
+    const endTimeISO = adjustedStartDate
+      ? new Date(adjustedStartDate.getTime() + duration * 60000).toISOString()
       : undefined;
     
     return {
@@ -102,9 +116,10 @@ const normalizeEvents = (rows: SupabaseBookingRow[]): CalendarEvent[] =>
       meetingLink: row.meet_link ?? "",
       teamMember: row.team_member ?? undefined,
       duration: duration,
-      startTime: startTime,
-      endTime: endTime,
-      bookingTime: row.booking_time,
+      startTime: startTimeISO,
+      endTime: endTimeISO,
+      bookingTime: startTimeISO ?? row.booking_time,
+      originalBookingTime: row.booking_time,
       customerName: row.customer_name,
       customerEmail: row.customer_email,
       phoneNumber: row.phone_number,
@@ -348,12 +363,16 @@ const Index = () => {
       const day = String(date.getDate()).padStart(2, "0");
       const dateStr = `${year}-${month}-${day}`;
 
+      const utcStart = new Date(`${dateStr}T00:00:00Z`);
+      const rangeStart = new Date(utcStart.getTime() + DISPLAY_TIME_OFFSET_MS);
+      const rangeEnd = new Date(rangeStart.getTime() + DAY_IN_MS);
+
       // Build query - filter by date
       let query = supabase
         .from("bookings")
         .select("id, product_name, summary, booking_time, meet_link, team_member, duration, customer_name, customer_email, phone_number, payment_status")
-        .gte("booking_time", `${dateStr}T00:00:00Z`)
-        .lt("booking_time", `${dateStr}T23:59:59Z`);
+        .gte("booking_time", rangeStart.toISOString())
+        .lt("booking_time", rangeEnd.toISOString());
 
       // If admin and a specific team member is selected, filter by that member
       if (teamMember.toLowerCase() === "admin" && selectedTeamMemberFilter) {
@@ -379,8 +398,9 @@ const Index = () => {
       }
 
       const normalized = data ? normalizeEvents(data) : [];
-      setDayViewEvents(normalized);
-      return normalized;
+      const filtered = normalized.filter((event) => event.date === dateStr);
+      setDayViewEvents(filtered);
+      return filtered;
     },
     [selectedTeamMemberFilter]
   );
