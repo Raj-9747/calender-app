@@ -78,8 +78,8 @@ type SupabaseBookingRow = {
   payment_status: string | null;
 };
 
-const DISPLAY_TIME_OFFSET_HOURS = 5;
-const DISPLAY_TIME_OFFSET_MS = DISPLAY_TIME_OFFSET_HOURS * 60 * 60 * 1000;
+const DISPLAY_TIME_OFFSET_MINUTES = 5 * 60 + 30; // 5 hours 30 minutes
+const DISPLAY_TIME_OFFSET_MS = DISPLAY_TIME_OFFSET_MINUTES * 60 * 1000;
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
 
 const shiftBookingTime = (isoString?: string): Date | null => {
