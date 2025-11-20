@@ -122,6 +122,17 @@ const EventDetailsModal = ({ isOpen, event, onClose }: EventDetailsModalProps) =
           </div>
         )}
 
+        {/* Customer Name */}
+        {event.customerName && (
+          <div className="mb-6">
+            <div className="flex items-center gap-2 text-sm mb-2">
+              <User className="h-4 w-4 text-muted-foreground" />
+              <h3 className="text-sm font-medium text-foreground">Customer Name</h3>
+            </div>
+            <p className="text-sm text-muted-foreground ml-6">{event.customerName}</p>
+          </div>
+        )}
+
         {/* Description */}
         <div className="mb-6">
           <h3 className="text-sm font-medium text-foreground mb-2">Description</h3>
