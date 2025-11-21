@@ -8,6 +8,8 @@ interface EventDetailsModalProps {
   onClose: () => void;
 }
 
+const DISPLAY_TIMEZONE = "UTC";
+
 const EventDetailsModal = ({ isOpen, event, onClose }: EventDetailsModalProps) => {
   const formatDateDisplay = (dateStr: string): string => {
     const date = new Date(dateStr + "T00:00:00");
@@ -28,6 +30,7 @@ const EventDetailsModal = ({ isOpen, event, onClose }: EventDetailsModalProps) =
       hour: "numeric",
       minute: "2-digit",
       hour12: true,
+      timeZone: DISPLAY_TIMEZONE,
     });
   };
 

@@ -11,6 +11,7 @@ interface DayViewProps {
 }
 
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
+const DISPLAY_TIMEZONE = "UTC";
 
 const PIXELS_PER_MINUTE = 3;
 const HOUR_HEIGHT = 60 * PIXELS_PER_MINUTE;      // 180px
@@ -21,6 +22,7 @@ const format12 = (date: Date): string =>
     hour: "numeric",
     minute: "2-digit",
     hour12: true,
+    timeZone: DISPLAY_TIMEZONE,
   });
 
 const getEventColor = (
@@ -68,7 +70,7 @@ export default function DayView({
         const duration = ev.duration ?? 60;
 
         const minutesSinceMidnight =
-          start.getHours() * 60 + start.getMinutes();
+          start.getUTCHours() * 60 + start.getUTCMinutes();
 
         const top = minutesSinceMidnight * PIXELS_PER_MINUTE;
         const height = Math.max(duration * PIXELS_PER_MINUTE, 40);

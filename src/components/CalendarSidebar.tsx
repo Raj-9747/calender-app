@@ -32,6 +32,8 @@ interface CalendarSidebarProps {
   isCollapsed?: boolean;
 }
 
+const DISPLAY_TIMEZONE = "UTC";
+
 const CalendarSidebar = ({
   currentDate,
   events,
@@ -89,6 +91,7 @@ const CalendarSidebar = ({
       date.toLocaleTimeString([], {
         hour: "numeric",
         minute: "2-digit",
+        timeZone: DISPLAY_TIMEZONE,
       });
 
     if (!end) return fmt(start);
