@@ -1,11 +1,13 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "@/lib/supabaseClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
+
+const defaultTeamMembers = ["Gauri", "Monica", "Shafoli"];
+const TEAM_PASSWORD = "12345";
 
 const Login = () => {
   const [teamMember, setTeamMember] = useState("");
@@ -25,42 +27,44 @@ const Login = () => {
     e.preventDefault();
     setIsLoading(true);
 
+    const enteredName = teamMember.trim();
+    const normalizedEnteredName = enteredName.toLowerCase();
+
+    const handleInvalidCredentials = () =>
+      toast.error("Invalid credentials", {
+        description: "The username and password combination is incorrect.",
+      });
+
     try {
-      // Check if admin login
-      if (teamMember.toLowerCase().trim() === "admin" && password === "12345") {
-        // Admin login successful
+      if (normalizedEnteredName === "admin") {
+        if (password !== TEAM_PASSWORD) {
+          handleInvalidCredentials();
+          return;
+        }
+
         localStorage.setItem("team_member", "admin");
         toast.success("Login successful!");
         navigate("/");
         return;
       }
 
-      // Check if team member exists in bookings table
-      const { data, error } = await supabase
-        .from("bookings")
-        .select("team_member")
-        .eq("team_member", teamMember.trim())
-        .limit(1);
+      const matchedTeamMember = defaultTeamMembers.find(
+        (member) => member.toLowerCase() === normalizedEnteredName,
+      );
 
-      if (error) {
-        console.error("Error checking team member:", error);
-        toast.error("Login failed", {
-          description: "An error occurred while checking credentials.",
+      if (!matchedTeamMember) {
+        toast.error("Invalid team member", {
+          description: "Only approved team members can log in.",
         });
-        setIsLoading(false);
         return;
       }
 
-      if (!data || data.length === 0) {
-        toast.error("Team member not found", {
-          description: "The team member name does not exist in the system.",
-        });
-        setIsLoading(false);
+      if (password !== TEAM_PASSWORD) {
+        handleInvalidCredentials();
         return;
       }
 
-      // Team member found, login successful
-      localStorage.setItem("team_member", teamMember.trim());
+      localStorage.setItem("team_member", matchedTeamMember);
       toast.success("Login successful!");
       navigate("/");
     } catch (err) {

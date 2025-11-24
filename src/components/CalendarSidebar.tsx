@@ -110,6 +110,13 @@ const CalendarSidebar = ({
         )
   );
 
+  const runActionAndCollapse = (action?: () => void) => {
+    action?.();
+    if (!isDesktop) {
+      onClose();
+    }
+  };
+
   return (
     <aside
       id="calendar-sidebar"
@@ -143,7 +150,7 @@ const CalendarSidebar = ({
             <Button
               type="button"
               variant="outline"
-              onClick={onViewUpcoming}
+              onClick={() => runActionAndCollapse(onViewUpcoming)}
               className="
                 w-full h-12 rounded-full border-[#d2d6e3]
                 flex items-center justify-center gap-2
@@ -157,7 +164,7 @@ const CalendarSidebar = ({
 
             <Button
               type="button"
-              onClick={onCreateAppointment}
+              onClick={() => runActionAndCollapse(onCreateAppointment)}
               className="
                 w-full h-12 rounded-full bg-[#1a73e8] 
                 text-sm font-medium flex items-center justify-center gap-2
@@ -176,7 +183,10 @@ const CalendarSidebar = ({
             <Calendar
               mode="single"
               selected={currentDate}
-              onSelect={(date) => date && onSelectDate(date)}
+              onSelect={(date) => {
+                if (!date) return;
+                runActionAndCollapse(() => onSelectDate(date));
+              }}
               className="w-full min-w-0 p-0 [&_.rdp-months]:flex [&_.rdp-months]:flex-col"
             />
           </div>
@@ -209,8 +219,8 @@ const CalendarSidebar = ({
             const customerName = getCustomerNameDisplay(event);
             const customerEmail = getCustomerEmailDisplay(event);
             return (
-            <div
-              key={event.id}
+                <div
+                  key={event.id}
               className="
                 group rounded-3xl border border-[#e0e3eb] 
                 bg-white px-5 py-4 
@@ -219,7 +229,7 @@ const CalendarSidebar = ({
                 hover:-translate-y-0.5 hover:shadow-[0_15px_30px_rgba(15,23,42,0.12)]
               "
               style={{ borderLeft: `5px solid ${getEventAccent(event)}` }}
-              onClick={() => onEventClick(event)}
+                  onClick={() => runActionAndCollapse(() => onEventClick(event))}
               title={`${displayTitle}\nEmail: ${customerEmail}`}
             >
               <div className="flex items-center gap-2 text-sm font-semibold text-[#202124] tracking-tight">

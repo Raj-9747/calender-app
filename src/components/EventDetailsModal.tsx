@@ -66,11 +66,18 @@ const EventDetailsModal = ({ isOpen, event, onClose }: EventDetailsModalProps) =
       onClick={onClose}
     >
       <div
-        className="bg-card rounded-lg shadow-[var(--shadow-lg)] max-w-md w-full p-6 animate-in fade-in zoom-in duration-200"
+        className="relative bg-card rounded-lg shadow-[var(--shadow-lg)] max-w-md w-full p-6 animate-in fade-in zoom-in duration-200"
         onClick={(e) => e.stopPropagation()}
       >
+        <button
+          className="absolute top-4 right-4 z-10 rounded-full p-2 text-muted-foreground transition-colors hover:bg-muted/40 hover:text-foreground"
+          aria-label="Close modal"
+          onClick={onClose}
+        >
+          <X className="h-5 w-5" />
+        </button>
         {/* Header */}
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between mb-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between mb-6 pr-8">
           <div className="flex-1 space-y-2">
             <div>
               <h2 id="detailTitle" className="text-2xl font-semibold text-foreground mb-1 break-words">
@@ -98,13 +105,6 @@ const EventDetailsModal = ({ isOpen, event, onClose }: EventDetailsModalProps) =
               </p>
             </div>
           </div>
-          <button
-            className="text-muted-foreground hover:text-foreground transition-colors"
-            aria-label="Close modal"
-            onClick={onClose}
-          >
-            <X className="h-5 w-5" />
-          </button>
         </div>
 
         {/* Time Information */}
