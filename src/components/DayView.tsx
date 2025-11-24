@@ -1,6 +1,10 @@
 import { useMemo } from "react";
 import { CalendarEvent } from "@/pages/Index";
 import { Video } from "lucide-react";
+import {
+  getCustomerEmailDisplay,
+  getEventDisplayTitle,
+} from "@/lib/eventDisplay";
 
 interface DayViewProps {
   date: Date;
@@ -98,13 +102,13 @@ export default function DayView({
       {/* SHARED SCROLL CONTAINER (Hours + Timeline) */}
       <div
         id="dayViewSharedScroll"
-        className="flex-1 overflow-y-auto overflow-x-hidden min-h-0"
+        className="flex-1 overflow-y-auto overflow-x-auto min-h-0"
         style={{
           maxHeight: "calc(100vh - 190px)",
         }}
       >
         {/* TABLE STRUCTURE */}
-        <table className="table-fixed w-full border-collapse">
+        <table className="table-fixed w-full min-w-[720px] border-collapse">
           <colgroup>
             <col style={{ width: "90px" }} />
             <col />
@@ -165,6 +169,8 @@ export default function DayView({
                       const bg = hexToRgba(color, 0.1);
                       const border = hexToRgba(color, 0.3);
 
+                      const emailLabel = getCustomerEmailDisplay(ev);
+                      const displayTitle = getEventDisplayTitle(ev);
                       return (
                         <div
                           key={ev.id}
@@ -177,18 +183,23 @@ export default function DayView({
                             borderLeftColor: color,
                           }}
                           onClick={() => onEventClick(ev)}
+                          title={`${displayTitle}\nEmail: ${emailLabel}`}
                         >
-                          <div className="p-2 flex flex-col h-full">
-                            <div className="text-xs font-semibold truncate">
-                              {ev.title || "Untitled Event"}
+                          <div className="p-2 flex flex-col h-full gap-1">
+                            <div className="text-xs font-semibold line-clamp-2">
+                              {displayTitle}
                             </div>
 
                             <div className="text-xs text-[#5f6368]">
                               {format12(start)} – {format12(end)}
                             </div>
 
+                            <div className="text-[11px] text-[#5f6368]">
+                              Email: {emailLabel}
+                            </div>
+
                             {ev.teamMember && (
-                              <div className="text-xs text-[#5f6368]">
+                              <div className="text-[11px] text-[#5f6368]">
                                 {ev.teamMember}
                               </div>
                             )}

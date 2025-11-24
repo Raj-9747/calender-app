@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -10,6 +10,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { X } from "lucide-react";
+
+const defaultTeamMembers = ["Gauri", "Test", "Admin"];
 
 interface AppointmentScheduleModalProps {
   isOpen: boolean;
@@ -53,6 +55,10 @@ const AppointmentScheduleModal = ({
   const [meetingLink, setMeetingLink] = useState("");
   const [description, setDescription] = useState("");
   const [selectedTeamMember, setSelectedTeamMember] = useState("");
+  const mergedTeamMembers = useMemo(
+    () => Array.from(new Set([...defaultTeamMembers, ...teamMembers])),
+    [teamMembers]
+  );
 
   useEffect(() => {
     if (isOpen && selectedDate) {
@@ -76,10 +82,10 @@ const AppointmentScheduleModal = ({
     }
 
     if (isAdmin) {
-      const fallbackMember = initialTeamMember ?? teamMembers[0] ?? "";
+      const fallbackMember = initialTeamMember ?? mergedTeamMembers[0] ?? "";
       setSelectedTeamMember(fallbackMember);
     }
-  }, [isOpen, isAdmin, initialTeamMember, teamMembers]);
+  }, [isOpen, isAdmin, initialTeamMember, mergedTeamMembers]);
 
   const handleSubmit = async () => {
     if (!serviceType.trim() || !date || !time) return;
@@ -216,13 +222,13 @@ const AppointmentScheduleModal = ({
                 <Select
                   value={selectedTeamMember || undefined}
                   onValueChange={(value) => setSelectedTeamMember(value)}
-                  disabled={teamMembers.length === 0}
+                  disabled={mergedTeamMembers.length === 0}
                 >
                   <SelectTrigger className="w-full">
                     <SelectValue placeholder="Choose team member" />
                   </SelectTrigger>
                   <SelectContent>
-                    {teamMembers.map((member) => (
+                    {mergedTeamMembers.map((member) => (
                       <SelectItem key={member} value={member}>
                         {member}
                       </SelectItem>

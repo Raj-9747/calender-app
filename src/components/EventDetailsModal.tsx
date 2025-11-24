@@ -1,6 +1,11 @@
 import { Button } from "@/components/ui/button";
 import { X, Video, Clock, User } from "lucide-react";
 import { CalendarEvent } from "@/pages/Index";
+import {
+  getCustomerEmailDisplay,
+  getCustomerNameDisplay,
+  getEventDisplayTitle,
+} from "@/lib/eventDisplay";
 
 interface EventDetailsModalProps {
   isOpen: boolean;
@@ -50,6 +55,9 @@ const EventDetailsModal = ({ isOpen, event, onClose }: EventDetailsModalProps) =
   const startTime = event.startTime ? formatTime12Hour(event.startTime) : null;
   const endTime = event.endTime ? formatTime12Hour(event.endTime) : null;
   const duration = event.duration ?? null;
+  const displayTitle = getEventDisplayTitle(event);
+  const customerNameDisplay = getCustomerNameDisplay(event);
+  const customerEmailDisplay = getCustomerEmailDisplay(event);
 
   return (
     <div
@@ -62,20 +70,32 @@ const EventDetailsModal = ({ isOpen, event, onClose }: EventDetailsModalProps) =
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex-1">
-            <h2 id="detailTitle" className="text-2xl font-semibold text-foreground mb-1">
-              {event.title}
-            </h2>
-            <div className="flex items-center gap-3">
-              <p id="detailDate" className="text-sm text-muted-foreground">
-                {formatDateDisplay(event.date)}
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between mb-6">
+          <div className="flex-1 space-y-2">
+            <div>
+              <h2 id="detailTitle" className="text-2xl font-semibold text-foreground mb-1 break-words">
+                {displayTitle}
+              </h2>
+              <div className="flex flex-wrap items-center gap-3">
+                <p id="detailDate" className="text-sm text-muted-foreground">
+                  {formatDateDisplay(event.date)}
+                </p>
+                {event.paymentStatus && (
+                  <span className={getPaymentStatusClasses(event.paymentStatus)}>
+                    {`${event.paymentStatus.charAt(0).toUpperCase()}${event.paymentStatus.slice(1)}`}
+                  </span>
+                )}
+              </div>
+            </div>
+            <div className="space-y-1 text-sm text-foreground">
+              <p>
+                <span className="font-medium">Customer Name: </span>
+                <span className="text-muted-foreground">{customerNameDisplay}</span>
               </p>
-              {event.paymentStatus && (
-                <span className={getPaymentStatusClasses(event.paymentStatus)}>
-                  {`${event.paymentStatus.charAt(0).toUpperCase()}${event.paymentStatus.slice(1)}`}
-                </span>
-              )}
+              <p>
+                <span className="font-medium">Email: </span>
+                <span className="text-muted-foreground">{customerEmailDisplay}</span>
+              </p>
             </div>
           </div>
           <button
@@ -122,17 +142,6 @@ const EventDetailsModal = ({ isOpen, event, onClose }: EventDetailsModalProps) =
               <h3 className="text-sm font-medium text-foreground">Team Member</h3>
             </div>
             <p className="text-sm text-muted-foreground ml-6">{event.teamMember}</p>
-          </div>
-        )}
-
-        {/* Customer Name */}
-        {event.customerName && (
-          <div className="mb-6">
-            <div className="flex items-center gap-2 text-sm mb-2">
-              <User className="h-4 w-4 text-muted-foreground" />
-              <h3 className="text-sm font-medium text-foreground">Customer Name</h3>
-            </div>
-            <p className="text-sm text-muted-foreground ml-6">{event.customerName}</p>
           </div>
         )}
 

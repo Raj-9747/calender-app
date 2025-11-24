@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { Menu, Search, CircleUserRound, LogOut, Calendar as CalendarIcon, X } from "lucide-react";
+import { Menu, CircleUserRound, LogOut, Calendar as CalendarIcon, X } from "lucide-react";
 import CalendarHeader from "@/components/CalendarHeader";
 import CalendarGrid from "@/components/CalendarGrid";
 import DayView from "@/components/DayView";
@@ -8,7 +8,6 @@ import UpcomingEventsView from "@/components/UpcomingEventsView";
 import EventDetailsModal from "@/components/EventDetailsModal";
 import { supabase } from "@/lib/supabaseClient";
 import CalendarSidebar from "@/components/CalendarSidebar";
-import AddTaskModal from "@/components/AddTaskModal";
 import AppointmentScheduleModal from "@/components/AppointmentScheduleModal";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -30,25 +29,6 @@ export interface CalendarEvent {
   customerEmail?: string | null;
   phoneNumber?: string | null;
   paymentStatus?: string | null;
-}
-
-export interface TaskItem {
-  id: string;
-  title: string;
-  dueDate: string;
-  notes: string;
-}
-
-export interface AppointmentSchedule {
-  id: string;
-  serviceType: string;
-  date: string;
-  time: string;
-  duration: string;
-  meetingLink: string;
-  description: string;
-  customerName: string;
-  customerEmail: string;
 }
 
 type AppointmentFormValues = {
@@ -127,9 +107,8 @@ const normalizeEvents = (rows: SupabaseBookingRow[]): CalendarEvent[] =>
     };
   });
 
-const generateId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
-
 type ViewMode = "month" | "day" | "upcoming";
+const defaultTeamMembers = ["Gauri", "Monica", "Shafoli"];
 
 const Index = () => {
   const navigate = useNavigate();
@@ -142,13 +121,10 @@ const Index = () => {
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
   const [isSavingAppointment, setIsSavingAppointment] = useState(false);
-  const [tasks, setTasks] = useState<TaskItem[]>([]);
-  const [appointments, setAppointments] = useState<AppointmentSchedule[]>([]);
-  const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
   const [isAppointmentModalOpen, setIsAppointmentModalOpen] = useState(false);
   const [teamMember, setTeamMember] = useState<string | null>(null);
   const [selectedTeamMemberFilter, setSelectedTeamMemberFilter] = useState<string | null>(null);
-  const [availableTeamMembers, setAvailableTeamMembers] = useState<string[]>([]);
+  const [availableTeamMembers, setAvailableTeamMembers] = useState<string[]>(defaultTeamMembers);
   const [isDesktopViewport, setIsDesktopViewport] = useState<boolean>(() => {
     if (typeof window === "undefined") return true;
     return window.matchMedia("(min-width: 1024px)").matches;
@@ -212,6 +188,7 @@ const Index = () => {
 
       if (error) {
         console.error("Failed to fetch team members:", error);
+        setAvailableTeamMembers(defaultTeamMembers);
         return;
       }
 
@@ -220,9 +197,11 @@ const Index = () => {
         new Set(data.map((row) => row.team_member).filter((member): member is string => member !== null))
       ).sort();
 
-      setAvailableTeamMembers(distinctMembers);
+      const mergedMembers = Array.from(new Set([...defaultTeamMembers, ...distinctMembers]));
+      setAvailableTeamMembers(mergedMembers);
     } catch (err) {
       console.error("Error fetching team members:", err);
+      setAvailableTeamMembers(defaultTeamMembers);
     }
   }, [isAdmin]);
 
@@ -471,18 +450,6 @@ const Index = () => {
     }
   }, [dayViewDate, viewMode, loadDayViewEvents]);
 
-  const handleCreateAction = (type: "event" | "task" | "appointment") => {
-    if (type === "event" || type === "appointment") {
-      openAppointmentModal(currentDate);
-      return;
-    }
-    if (type === "task") {
-      setIsTaskModalOpen(true);
-      return;
-    }
-    setIsAppointmentModalOpen(true);
-  };
-
   const renderEvents = useCallback(
     (date: Date): CalendarEvent[] => {
       const dateStr = formatDate(date);
@@ -494,11 +461,6 @@ const Index = () => {
   const showEventDetails = (event: CalendarEvent) => {
     setSelectedEvent(event);
     setIsDetailsModalOpen(true);
-  };
-
-  const handleAddTask = (title: string, dueDate: string, notes: string) => {
-    setTasks((prev) => [...prev, { id: generateId(), title, dueDate, notes }]);
-    setIsTaskModalOpen(false);
   };
 
   const handleAddAppointment = useCallback(
@@ -612,21 +574,6 @@ const Index = () => {
 
         toast.success("Appointment scheduled successfully!");
 
-        setAppointments((prev) => [
-          ...prev,
-          {
-            id: generateId(),
-            serviceType: serviceTypeValue,
-            date: values.date,
-            time: values.time,
-            duration: `${durationMinutes}`,
-            meetingLink: values.meetingLink,
-            description: values.description,
-            customerName: values.customerName,
-            customerEmail: values.customerEmail,
-          },
-        ]);
-
         setIsAppointmentModalOpen(false);
         setSelectedDate(null);
       } catch (err) {
@@ -643,7 +590,7 @@ const Index = () => {
   return (
     <div className="min-h-screen bg-[#f6f8fc]">
       <div className="flex h-screen flex-col">
-        <header className="flex items-center justify-between border-b border-[#e0e3eb] bg-white px-4 py-3 shadow-sm md:px-8">
+        <header className="flex flex-wrap items-center justify-between gap-4 border-b border-[#e0e3eb] bg-white px-4 py-3 shadow-sm md:px-8">
           <div className="flex items-center gap-4">
             <button
               type="button"
@@ -675,7 +622,7 @@ const Index = () => {
             />
           </div> */}
 
-          <div className="flex items-center gap-3">
+          <div className="flex w-full flex-wrap items-center justify-end gap-3 sm:w-auto">
             {isAdmin && (
               <Select
                 value={selectedTeamMemberFilter || "all"}
@@ -683,7 +630,7 @@ const Index = () => {
                   setSelectedTeamMemberFilter(value === "all" ? null : value);
                 }}
               >
-                <SelectTrigger className="w-[180px] h-9 text-sm">
+                <SelectTrigger className="h-9 w-full text-sm sm:w-[180px]">
                   <SelectValue placeholder="Select team member" />
                 </SelectTrigger>
                 <SelectContent>
@@ -733,10 +680,8 @@ const Index = () => {
           <CalendarSidebar
             currentDate={currentDate}
             events={events}
-            tasks={tasks}
-            appointments={appointments}
             onSelectDate={handleSidebarDateSelect}
-            onCreate={handleCreateAction}
+            onCreateAppointment={() => openAppointmentModal(currentDate)}
             onEventClick={showEventDetails}
             teamMemberColors={teamMemberColors}
             isAdmin={isAdmin}
@@ -845,19 +790,12 @@ const Index = () => {
                 onTeamMemberFilterChange={setSelectedTeamMemberFilter}
                 onBackToCalendar={() => setViewMode("month")}
                 onEventClick={showEventDetails}
-                onCreateEvent={() => handleCreateAction("event")}
+                onCreateAppointment={() => openAppointmentModal(currentDate)}
               />
             )}
           </main>
         </div>
       </div>
-
-      <AddTaskModal
-        isOpen={isTaskModalOpen}
-        selectedDate={currentDate}
-        onClose={() => setIsTaskModalOpen(false)}
-        onAddTask={handleAddTask}
-      />
 
       <AppointmentScheduleModal
         isOpen={isAppointmentModalOpen}

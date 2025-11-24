@@ -1,4 +1,5 @@
 import { CalendarEvent } from "@/pages/Index";
+import { getCustomerEmailDisplay, getEventDisplayTitle } from "@/lib/eventDisplay";
 
 interface CalendarGridProps {
   currentDate: Date;
@@ -94,80 +95,87 @@ const CalendarGrid = ({
 
   return (
     <div className="rounded-3xl border border-[#d2d6e3] bg-white shadow-sm">
-      {/* Days of Week Header */}
-      <div className="grid grid-cols-7 border-b border-[#e0e3eb] text-xs font-semibold uppercase tracking-wide text-[#5f6368]">
-        {daysOfWeek.map((day) => (
-          <div key={day} className="px-4 py-3 text-right">
-            {day}
+      <div className="overflow-x-auto">
+        <div className="min-w-[720px]">
+          {/* Days of Week Header */}
+          <div className="grid grid-cols-7 border-b border-[#e0e3eb] text-[11px] font-semibold uppercase tracking-wide text-[#5f6368] sm:text-xs">
+            {daysOfWeek.map((day) => (
+              <div key={day} className="px-2 py-3 text-right sm:px-4">
+                {day}
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
 
-      {/* Calendar Grid */}
-      <div id="calendar" className="grid grid-cols-7">
-        {dates.map((date, index) => {
-          if (!date) return null;
+          {/* Calendar Grid */}
+          <div id="calendar" className="grid grid-cols-7">
+            {dates.map((date, index) => {
+              if (!date) return null;
 
-          const dayEvents = renderEvents(date);
-          const today = isToday(date);
-          const currentMonth = isCurrentMonth(date);
-          const isFirstOfMonth = date.getDate() === 1;
+              const dayEvents = renderEvents(date);
+              const today = isToday(date);
+              const currentMonth = isCurrentMonth(date);
+              const isFirstOfMonth = date.getDate() === 1;
 
-          return (
-            <button
-              type="button"
-              key={`day-${index}`}
-              className={`
-                flex min-h-[130px] flex-col border-b border-r border-[#e0e3eb] p-3 text-left transition
-                ${currentMonth ? "bg-white" : "bg-[#f8f9fa] text-[#9aa0a6]"}
-                ${today ? "relative" : ""}
-                hover:bg-[#f1f3f4]
-              `}
-              onClick={() => onDateClick(date)}
-            >
-              <div className="flex items-center justify-between text-xs font-medium text-[#5f6368]">
-                <span>{isFirstOfMonth ? date.toLocaleString(undefined, { month: "short" }) : ""}</span>
-                <span
+              return (
+                <button
+                  type="button"
+                  key={`day-${index}`}
                   className={`
-                    flex h-7 w-7 items-center justify-center rounded-full text-sm font-semibold
-                    ${today ? "bg-[#1a73e8] text-white" : "text-[#3c4043]"}
+                    flex min-h-[100px] flex-col border-b border-r border-[#e0e3eb] p-2 text-left transition sm:min-h-[130px] sm:p-3
+                    ${currentMonth ? "bg-white" : "bg-[#f8f9fa] text-[#9aa0a6]"}
+                    ${today ? "relative" : ""}
+                    hover:bg-[#f1f3f4]
                   `}
+                  onClick={() => onDateClick(date)}
                 >
-                  {date.getDate()}
-                </span>
-              </div>
-
-              <div className="mt-2 flex flex-col gap-1">
-                {dayEvents.length === 0 && (
-                  <span className="text-xs text-transparent">placeholder</span>
-                )}
-
-                {dayEvents.map((event) => {
-                  const colors = getEventColor(event);
-                  return (
-                    <div
-                      key={event.id}
-                      className="rounded-lg px-2 py-1 text-xs font-medium line-clamp-2 cursor-pointer hover:opacity-80 transition-opacity"
-                      style={{
-                        backgroundColor: colors.bg,
-                        borderColor: colors.border,
-                        color: colors.text,
-                        borderWidth: "1px",
-                        borderStyle: "solid",
-                      }}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onEventClick(event);
-                      }}
+                  <div className="flex items-center justify-between text-[11px] font-medium text-[#5f6368] sm:text-xs">
+                    <span>{isFirstOfMonth ? date.toLocaleString(undefined, { month: "short" }) : ""}</span>
+                    <span
+                      className={`
+                        flex h-7 w-7 items-center justify-center rounded-full text-sm font-semibold
+                        ${today ? "bg-[#1a73e8] text-white" : "text-[#3c4043]"}
+                      `}
                     >
-                      {event.title}
-                    </div>
-                  );
-                })}
-              </div>
-            </button>
-          );
-        })}
+                      {date.getDate()}
+                    </span>
+                  </div>
+
+                  <div className="mt-2 flex flex-col gap-1">
+                    {dayEvents.length === 0 && (
+                      <span className="text-xs text-transparent">placeholder</span>
+                    )}
+
+                    {dayEvents.map((event) => {
+                      const colors = getEventColor(event);
+                      const displayTitle = getEventDisplayTitle(event);
+                      const emailDisplay = getCustomerEmailDisplay(event);
+                      return (
+                        <div
+                          key={event.id}
+                          className="rounded-lg px-2 py-1 text-[11px] font-medium line-clamp-2 cursor-pointer hover:opacity-80 transition-opacity sm:text-xs"
+                          style={{
+                            backgroundColor: colors.bg,
+                            borderColor: colors.border,
+                            color: colors.text,
+                            borderWidth: "1px",
+                            borderStyle: "solid",
+                          }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onEventClick(event);
+                          }}
+                          title={`${displayTitle}\nEmail: ${emailDisplay}`}
+                        >
+                          {displayTitle}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
       </div>
     </div>
   );
