@@ -4,6 +4,7 @@ import { CalendarEvent } from "@/pages/Index";
 import {
   getCustomerEmailDisplay,
   getCustomerNameDisplay,
+  getCustomerPhoneDisplay,
   getEventDisplayTitle,
 } from "@/lib/eventDisplay";
 
@@ -58,6 +59,7 @@ const EventDetailsModal = ({ isOpen, event, onClose }: EventDetailsModalProps) =
   const displayTitle = getEventDisplayTitle(event);
   const customerNameDisplay = getCustomerNameDisplay(event);
   const customerEmailDisplay = getCustomerEmailDisplay(event);
+  const customerPhoneDisplay = getCustomerPhoneDisplay(event);
 
   return (
     <div
@@ -102,6 +104,10 @@ const EventDetailsModal = ({ isOpen, event, onClose }: EventDetailsModalProps) =
               <p>
                 <span className="font-medium">Email: </span>
                 <span className="text-muted-foreground">{customerEmailDisplay}</span>
+              </p>
+              <p>
+                <span className="font-medium">Phone: </span>
+                <span className="text-muted-foreground">{customerPhoneDisplay}</span>
               </p>
             </div>
           </div>

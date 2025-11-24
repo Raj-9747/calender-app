@@ -21,6 +21,7 @@ import {
 import {
   getCustomerEmailDisplay,
   getCustomerNameDisplay,
+  getCustomerPhoneDisplay,
   getEventDisplayTitle,
 } from "@/lib/eventDisplay";
 
@@ -260,6 +261,7 @@ const UpcomingEventsView = ({
 
                       const customerName = getCustomerNameDisplay(event);
                       const customerEmail = getCustomerEmailDisplay(event);
+                      const customerPhone = getCustomerPhoneDisplay(event);
                       const displayTitle = getEventDisplayTitle(event);
                       return (
                         <div
@@ -280,6 +282,9 @@ const UpcomingEventsView = ({
                               </p>
                               <p className="text-sm text-[#5f6368]">
                                 Email: {customerEmail}
+                              </p>
+                              <p className="text-sm text-[#5f6368]">
+                                Phone: {customerPhone}
                               </p>
                               {event.description && (
                                 <p className="text-sm text-[#5f6368] line-clamp-2">{event.description}</p>
