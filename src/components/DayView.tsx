@@ -108,7 +108,7 @@ export default function DayView({
         }}
       >
         {/* TABLE STRUCTURE */}
-        <table className="table-fixed w-full min-w-[720px] border-collapse">
+        <table className="table-fixed w-full min-w-full border-collapse">
           <colgroup>
             <col style={{ width: "90px" }} />
             <col />

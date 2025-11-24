@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Menu, CircleUserRound, LogOut, Calendar as CalendarIcon, X } from "lucide-react";
 import CalendarHeader from "@/components/CalendarHeader";
@@ -12,6 +12,7 @@ import AppointmentScheduleModal from "@/components/AppointmentScheduleModal";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 export interface CalendarEvent {
   id: string;
@@ -112,6 +113,7 @@ const defaultTeamMembers = ["Gauri", "Monica", "Shafoli"];
 
 const Index = () => {
   const navigate = useNavigate();
+  const isMobileViewport = useIsMobile();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("month");
@@ -134,6 +136,46 @@ const Index = () => {
     return window.matchMedia("(min-width: 1024px)").matches;
   });
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isMobileEventsSheetOpen, setIsMobileEventsSheetOpen] = useState(false);
+  const [mobileSheetEvents, setMobileSheetEvents] = useState<CalendarEvent[]>([]);
+  const [mobileSheetDate, setMobileSheetDate] = useState<Date | null>(null);
+  const [isMobileSheetVisible, setIsMobileSheetVisible] = useState(false);
+  const mobileSheetCloseTimeout = useRef<number | null>(null);
+  const MOBILE_SHEET_TRANSITION_MS = 280;
+  const getMobileEventAccent = (event: CalendarEvent): string => {
+    if (event.teamMember && teamMemberColors?.get(event.teamMember)) {
+      return teamMemberColors.get(event.teamMember)!;
+    }
+    return "#1a73e8";
+  };
+  const hexToRgba = (hex: string, alpha: number): string => {
+    const sanitized = hex.replace("#", "");
+    const bigint = Number.parseInt(sanitized, 16);
+    const r = (bigint >> 16) & 255;
+    const g = (bigint >> 8) & 255;
+    const b = bigint & 255;
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  };
+  useEffect(() => {
+    return () => {
+      if (mobileSheetCloseTimeout.current) {
+        window.clearTimeout(mobileSheetCloseTimeout.current);
+      }
+    };
+  }, []);
+  const closeMobileSheet = useCallback(() => {
+    if (!isMobileEventsSheetOpen) return;
+    setIsMobileSheetVisible(false);
+    if (mobileSheetCloseTimeout.current) {
+      window.clearTimeout(mobileSheetCloseTimeout.current);
+    }
+    mobileSheetCloseTimeout.current = window.setTimeout(() => {
+      setIsMobileEventsSheetOpen(false);
+      setMobileSheetEvents([]);
+      setMobileSheetDate(null);
+      mobileSheetCloseTimeout.current = null;
+    }, MOBILE_SHEET_TRANSITION_MS);
+  }, [isMobileEventsSheetOpen, MOBILE_SHEET_TRANSITION_MS]);
 
   // Load team member from localStorage on mount
   useEffect(() => {
@@ -428,10 +470,29 @@ const Index = () => {
   };
 
   const handleDateClick = (date: Date) => {
+    if (isMobileViewport) {
+      const targetDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+      const dateKey = formatDate(targetDate);
+      const eventsForDay = events.filter((event) => event.date === dateKey);
+      setMobileSheetDate(targetDate);
+      setMobileSheetEvents(eventsForDay);
+      if (mobileSheetCloseTimeout.current) {
+        window.clearTimeout(mobileSheetCloseTimeout.current);
+        mobileSheetCloseTimeout.current = null;
+      }
+      setIsMobileEventsSheetOpen(true);
+      requestAnimationFrame(() => setIsMobileSheetVisible(true));
+      closeSidebar();
+      return;
+    }
     openAppointmentModal(date);
   };
 
   const handleSidebarDateSelect = (date: Date) => {
+    if (isMobileViewport) {
+      handleDateClick(date);
+      return;
+    }
     const selectedDateObj = new Date(date.getFullYear(), date.getMonth(), date.getDate());
     setCurrentDate(selectedDateObj);
     setDayViewDate(selectedDateObj);
@@ -590,8 +651,8 @@ const Index = () => {
   return (
     <div className="min-h-screen bg-[#f6f8fc]">
       <div className="flex h-screen flex-col">
-        <header className="flex flex-wrap items-center justify-between gap-4 border-b border-[#e0e3eb] bg-white px-4 py-3 shadow-sm md:px-8">
-          <div className="flex items-center gap-4">
+        <header className="border-b border-[#e0e3eb] bg-white px-4 py-3 shadow-sm md:px-8">
+          <div className="flex w-full items-center gap-2 flex-nowrap">
             <button
               type="button"
               className="rounded-full p-2 text-[#5f6368] hover:bg-[#f1f3f4]"
@@ -606,23 +667,15 @@ const Index = () => {
                 <Menu className="h-5 w-5" />
               )}
             </button>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 min-w-0">
               <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-[#d2d6e3] bg-white text-lg font-semibold text-[#1a73e8]">
                 14
               </div>
-              <span className="text-xl font-semibold text-[#5f6368]">Calendar</span>
+              <span className="text-xl font-semibold text-[#5f6368] truncate">Calendar</span>
             </div>
-          </div>
-{/* 
-          <div className="hidden max-w-md flex-1 items-center gap-2 rounded-full border border-[#d2d6e3] bg-[#f1f3f4] px-4 py-2 text-sm text-[#5f6368] md:flex">
-            <Search className="h-4 w-4" />
-            <Input
-              placeholder="Search people and events"
-              className="h-auto border-none bg-transparent p-0 text-sm placeholder:text-[#5f6368] focus-visible:ring-0"
-            />
-          </div> */}
-
-          <div className="flex w-full flex-wrap items-center justify-end gap-3 sm:w-auto">
+            {teamMember && (
+              <span className="text-sm text-[#5f6368] flex-shrink-0 px-2">{teamMember}</span>
+            )}
             {isAdmin && (
               <Select
                 value={selectedTeamMemberFilter || "all"}
@@ -630,8 +683,8 @@ const Index = () => {
                   setSelectedTeamMemberFilter(value === "all" ? null : value);
                 }}
               >
-                <SelectTrigger className="h-9 w-full text-sm sm:w-[180px]">
-                  <SelectValue placeholder="Select team member" />
+                <SelectTrigger className="hidden h-9 w-[150px] text-sm sm:inline-flex">
+                  <SelectValue placeholder="Team member" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Members</SelectItem>
@@ -643,56 +696,41 @@ const Index = () => {
                 </SelectContent>
               </Select>
             )}
-            {teamMember && (
-              <span className="hidden text-sm text-[#5f6368] md:inline-flex">
-                {teamMember}
-              </span>
-            )}
-            {/* <button
-              type="button"
-              className="hidden rounded-full border border-[#d2d6e3] px-4 py-2 text-sm font-medium text-[#5f6368] hover:bg-[#f1f3f4] md:inline-flex"
-            >
-              Support
-            </button> */}
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              onClick={handleLogout}
-              className="rounded-full text-[#5f6368] hover:bg-[#f1f3f4]"
-              title="Logout"
-            >
-              <LogOut className="h-5 w-5" />
-            </Button>
-            <CircleUserRound className="h-9 w-9 text-[#5f6368]" />
+            <div className="flex items-center gap-2 flex-shrink-0 ml-auto">
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={handleLogout}
+                className="rounded-full text-[#5f6368] hover:bg-[#f1f3f4]"
+                title="Logout"
+              >
+                <LogOut className="h-5 w-5" />
+              </Button>
+              <CircleUserRound className="h-9 w-9 text-[#5f6368]" />
+            </div>
           </div>
         </header>
 
-        <div className="flex flex-1 overflow-hidden">
-          {!isDesktopViewport && (
-            <div
-              className={`fixed inset-0 z-40 bg-black/40 transition-opacity duration-300 ease-in-out lg:hidden ${
-                isSidebarOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
-              }`}
-              onClick={closeSidebar}
+        <div className="flex flex-1 overflow-hidden w-full">
+          {isDesktopViewport && (
+            <CalendarSidebar
+              currentDate={currentDate}
+              events={events}
+              onSelectDate={handleSidebarDateSelect}
+              onCreateAppointment={() => openAppointmentModal(currentDate)}
+              onEventClick={showEventDetails}
+              teamMemberColors={teamMemberColors}
+              isAdmin={isAdmin}
+              onViewUpcoming={handleViewUpcomingEvents}
+              isOpen
+              onClose={closeSidebar}
+              isDesktop
+              isCollapsed={isSidebarCollapsed}
             />
           )}
-          <CalendarSidebar
-            currentDate={currentDate}
-            events={events}
-            onSelectDate={handleSidebarDateSelect}
-            onCreateAppointment={() => openAppointmentModal(currentDate)}
-            onEventClick={showEventDetails}
-            teamMemberColors={teamMemberColors}
-            isAdmin={isAdmin}
-            onViewUpcoming={handleViewUpcomingEvents}
-            isOpen={isDesktopViewport ? true : isSidebarOpen}
-            onClose={closeSidebar}
-            isDesktop={isDesktopViewport}
-            isCollapsed={isDesktopViewport ? isSidebarCollapsed : false}
-          />
 
-          <main className="flex-1 min-w-0 overflow-hidden flex flex-col">
+          <main className="flex-1 min-w-0 w-full overflow-hidden flex flex-col">
             {viewMode === "month" && (
               <>
                 <div className="px-4 py-6 sm:px-6 lg:px-10">
@@ -797,6 +835,31 @@ const Index = () => {
         </div>
       </div>
 
+      {!isDesktopViewport && (
+        <>
+          <div
+            className={`fixed inset-0 z-40 bg-black/40 transition-opacity duration-300 ease-in-out lg:hidden ${
+              isSidebarOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
+            }`}
+            onClick={closeSidebar}
+          />
+          <CalendarSidebar
+            currentDate={currentDate}
+            events={events}
+            onSelectDate={handleSidebarDateSelect}
+            onCreateAppointment={() => openAppointmentModal(currentDate)}
+            onEventClick={showEventDetails}
+            teamMemberColors={teamMemberColors}
+            isAdmin={isAdmin}
+            onViewUpcoming={handleViewUpcomingEvents}
+            isOpen={isSidebarOpen}
+            onClose={closeSidebar}
+            isDesktop={false}
+            isCollapsed={false}
+          />
+        </>
+      )}
+
       <AppointmentScheduleModal
         isOpen={isAppointmentModalOpen}
         selectedDate={selectedDate ?? currentDate}
@@ -819,6 +882,106 @@ const Index = () => {
           setSelectedEvent(null);
         }}
       />
+
+      {isMobileEventsSheetOpen && (
+        <div className="fixed inset-0 z-50 md:hidden">
+          <div
+            className={`absolute inset-0 bg-black/40 transition-opacity duration-300 ${
+              isMobileSheetVisible ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
+            }`}
+            onClick={closeMobileSheet}
+          />
+          <div
+            className={`absolute inset-x-0 bottom-0 rounded-t-3xl bg-white shadow-2xl max-h-[85vh] overflow-y-auto p-6 transform transition-transform duration-300 ease-out ${
+              isMobileSheetVisible ? "translate-y-0" : "translate-y-full"
+            }`}
+          >
+            <div className="absolute top-3 left-1/2 h-1.5 w-12 -translate-x-1/2 rounded-full bg-[#d2d6e3]" />
+            <button
+              type="button"
+              aria-label="Close events"
+              className="absolute top-3 right-4 rounded-full p-2 text-[#5f6368] hover:bg-[#f1f3f4]"
+              onClick={closeMobileSheet}
+            >
+              <X className="h-5 w-5" />
+            </button>
+            <div className="pt-8 pb-4 text-center">
+              <p className="text-xs uppercase tracking-[0.3em] text-[#5f6368]">
+                {mobileSheetDate?.toLocaleDateString(undefined, {
+                  weekday: "long",
+                  month: "short",
+                  day: "numeric",
+                })}
+              </p>
+              <h3 className="mt-2 text-2xl font-semibold text-[#202124]">
+                {mobileSheetEvents.length
+                  ? `${mobileSheetEvents.length} event${mobileSheetEvents.length === 1 ? "" : "s"}`
+                  : "No events"}
+              </h3>
+            </div>
+
+            {mobileSheetEvents.length === 0 ? (
+              <p className="text-sm text-center text-[#5f6368]">You’re all caught up for this date.</p>
+            ) : (
+              <div className="space-y-4 pb-4">
+                {mobileSheetEvents.map((event) => {
+                  const startTime = event.startTime
+                    ? new Date(event.startTime).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })
+                    : "N/A";
+                  const endTime = event.endTime
+                    ? new Date(event.endTime).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })
+                    : null;
+                  const accent = getMobileEventAccent(event);
+                  return (
+                    <div
+                      key={event.id}
+                      className="rounded-2xl border border-[#e0e3eb] p-4 shadow-sm"
+                      style={{
+                        borderLeft: `5px solid ${accent}`,
+                        backgroundColor: hexToRgba(accent, 0.08),
+                      }}
+                    >
+                      <p className="text-base font-semibold text-[#202124] mb-1">{event.title || "Untitled Event"}</p>
+                      <p className="text-sm text-[#5f6368] mb-2">Customer: {event.customerName ?? "Not provided"}</p>
+                      <div className="text-sm text-[#202124] flex flex-wrap gap-x-4 gap-y-1 mb-3">
+                        <span>
+                          Time: {startTime}
+                          {endTime ? ` – ${endTime}` : ""}
+                        </span>
+                        {event.duration && <span>Duration: {event.duration} min</span>}
+                      </div>
+                      {event.meetingLink && (
+                        <a
+                          href={event.meetingLink}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-sm text-[#1a73e8] font-medium hover:underline"
+                        >
+                          Join meeting
+                        </a>
+                      )}
+                      {event.teamMember && (
+                        <p className="mt-2 text-xs text-[#5f6368]">Owner: {event.teamMember}</p>
+                      )}
+                      <Button
+                        variant="link"
+                        className="px-0 mt-2 text-sm"
+                        onClick={() => {
+                          closeMobileSheet();
+                          setSelectedEvent(event);
+                          setIsDetailsModalOpen(true);
+                        }}
+                      >
+                        View details
+                      </Button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

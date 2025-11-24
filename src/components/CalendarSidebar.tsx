@@ -177,9 +177,9 @@ const CalendarSidebar = ({
           </div>
 
       {/* CALENDAR */}
-      <div className="p-0 sm:p-4">
+      <div className="px-4 py-4">
         <div className="rounded-2xl border border-[#e0e3eb] bg-white shadow-sm p-4">
-          <div className="[&_*.rdp]:!px-0 [&_*.rdp]:!mx-auto [&_*.rdp-months]:!w-full">
+          <div className="flex justify-center">
             <Calendar
               mode="single"
               selected={currentDate}
@@ -187,7 +187,7 @@ const CalendarSidebar = ({
                 if (!date) return;
                 runActionAndCollapse(() => onSelectDate(date));
               }}
-              className="w-full min-w-0 p-0 [&_.rdp-months]:flex [&_.rdp-months]:flex-col"
+              className="w-full max-w-sm min-w-0 p-0 [&_.rdp-months]:flex [&_.rdp-months]:flex-col [&_.rdp]:mx-auto"
             />
           </div>
         </div>

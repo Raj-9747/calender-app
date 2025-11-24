@@ -96,7 +96,7 @@ const CalendarGrid = ({
   return (
     <div className="rounded-3xl border border-[#d2d6e3] bg-white shadow-sm">
       <div className="overflow-x-auto">
-        <div className="min-w-[720px]">
+        <div className="min-w-full">
           {/* Days of Week Header */}
           <div className="grid grid-cols-7 border-b border-[#e0e3eb] text-[11px] font-semibold uppercase tracking-wide text-[#5f6368] sm:text-xs">
             {daysOfWeek.map((day) => (
@@ -121,14 +121,14 @@ const CalendarGrid = ({
                   type="button"
                   key={`day-${index}`}
                   className={`
-                    flex min-h-[100px] flex-col border-b border-r border-[#e0e3eb] p-2 text-left transition sm:min-h-[130px] sm:p-3
+                    flex min-h-[90px] flex-col border-b border-r border-[#e0e3eb] p-2 text-left transition sm:min-h-[130px] sm:p-3
                     ${currentMonth ? "bg-white" : "bg-[#f8f9fa] text-[#9aa0a6]"}
                     ${today ? "relative" : ""}
                     hover:bg-[#f1f3f4]
                   `}
                   onClick={() => onDateClick(date)}
                 >
-                  <div className="flex items-center justify-between text-[11px] font-medium text-[#5f6368] sm:text-xs">
+                  <div className="flex items-center justify-between text-xs font-medium text-[#5f6368] sm:text-xs">
                     <span>{isFirstOfMonth ? date.toLocaleString(undefined, { month: "short" }) : ""}</span>
                     <span
                       className={`
@@ -141,35 +141,55 @@ const CalendarGrid = ({
                   </div>
 
                   <div className="mt-2 flex flex-col gap-1">
-                    {dayEvents.length === 0 && (
-                      <span className="text-xs text-transparent">placeholder</span>
-                    )}
+                    <div className="hidden md:flex flex-col gap-1">
+                      {dayEvents.length === 0 && (
+                        <span className="text-xs text-transparent">placeholder</span>
+                      )}
 
-                    {dayEvents.map((event) => {
-                      const colors = getEventColor(event);
-                      const displayTitle = getEventDisplayTitle(event);
-                      const emailDisplay = getCustomerEmailDisplay(event);
-                      return (
-                        <div
-                          key={event.id}
-                          className="rounded-lg px-2 py-1 text-[11px] font-medium line-clamp-2 cursor-pointer hover:opacity-80 transition-opacity sm:text-xs"
-                          style={{
-                            backgroundColor: colors.bg,
-                            borderColor: colors.border,
-                            color: colors.text,
-                            borderWidth: "1px",
-                            borderStyle: "solid",
-                          }}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onEventClick(event);
-                          }}
-                          title={`${displayTitle}\nEmail: ${emailDisplay}`}
-                        >
-                          {displayTitle}
-                        </div>
-                      );
-                    })}
+                      {dayEvents.map((event) => {
+                        const colors = getEventColor(event);
+                        const displayTitle = getEventDisplayTitle(event);
+                        const emailDisplay = getCustomerEmailDisplay(event);
+                        return (
+                          <div
+                            key={event.id}
+                            className="rounded-lg px-2 py-1 text-[11px] font-medium line-clamp-2 cursor-pointer hover:opacity-80 transition-opacity sm:text-xs"
+                            style={{
+                              backgroundColor: colors.bg,
+                              borderColor: colors.border,
+                              color: colors.text,
+                              borderWidth: "1px",
+                              borderStyle: "solid",
+                            }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onEventClick(event);
+                            }}
+                            title={`${displayTitle}\nEmail: ${emailDisplay}`}
+                          >
+                            {displayTitle}
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-1 md:hidden min-h-[16px]">
+                      {dayEvents.slice(0, 5).map((event) => {
+                        const colors = getEventColor(event);
+                        return (
+                          <span
+                            key={`${event.id}-dot`}
+                            className="h-2.5 w-2.5 rounded-full"
+                            style={{ backgroundColor: colors.text }}
+                          />
+                        );
+                      })}
+                      {dayEvents.length > 5 && (
+                        <span className="text-[10px] font-medium text-[#5f6368]">
+                          +{dayEvents.length - 5}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </button>
               );
