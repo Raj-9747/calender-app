@@ -9,6 +9,7 @@ import EventDetailsModal from "@/components/EventDetailsModal";
 import { supabase } from "@/lib/supabaseClient";
 import CalendarSidebar from "@/components/CalendarSidebar";
 import AppointmentScheduleModal from "@/components/AppointmentScheduleModal";
+import DeleteEventModal from "@/components/DeleteEventModal";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -130,6 +131,9 @@ const Index = () => {
   const [teamMember, setTeamMember] = useState<string | null>(null);
   const [selectedTeamMemberFilter, setSelectedTeamMemberFilter] = useState<string | null>(null);
   const [availableTeamMembers, setAvailableTeamMembers] = useState<string[]>(defaultTeamMembers);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [eventToDelete, setEventToDelete] = useState<CalendarEvent | null>(null);
+  const [deletingEventId, setDeletingEventId] = useState<string | null>(null);
   const [isDesktopViewport, setIsDesktopViewport] = useState<boolean>(() => {
     if (typeof window === "undefined") return true;
     return window.matchMedia("(min-width: 1024px)").matches;
@@ -532,50 +536,52 @@ const Index = () => {
     setIsDetailsModalOpen(true);
   };
 
-  const handleDeleteEvent = useCallback(
-    async (event: CalendarEvent) => {
-      const confirmed = window.confirm("Are you sure you want to delete this event?");
-      if (!confirmed) return;
+  const handleDeleteEvent = useCallback((event: CalendarEvent) => {
+    setEventToDelete(event);
+    setIsDeleteModalOpen(true);
+  }, []);
 
-      const payload = {
-        id: event.id,
-        title: event.title ?? "",
-        description: event.description ?? "",
-        date: event.date,
-        meetingLink: event.meetingLink ?? null,
-        teamMember: event.teamMember ?? null,
-        duration: event.duration ?? null,
-        startTime: event.startTime ?? null,
-        endTime: event.endTime ?? null,
-        bookingTime: event.bookingTime ?? event.originalBookingTime ?? null,
-        customerName: event.customerName ?? null,
-        customerEmail: event.customerEmail ?? null,
-        phoneNumber: event.phoneNumber ?? null,
-        paymentStatus: event.paymentStatus ?? null,
-        isActive: event.isActive ?? true,
-      };
-
-      try {
-        const response = await fetch("https://n8n.srv898271.hstgr.cloud/webhook/delete-client-meeting", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(payload),
-        });
-
-        if (!response.ok) {
-          throw new Error(`Delete webhook responded with status ${response.status}`);
-        }
-
-        toast.success("Delete request sent.");
-      } catch (error) {
-        console.error("Failed to send delete request:", error);
-        toast.error("Failed to send delete request");
+  const confirmDelete = useCallback(async () => {
+    if (!eventToDelete) return;
+    const fullEventObject = {
+      id: eventToDelete.id,
+      title: eventToDelete.title ?? "",
+      description: eventToDelete.description ?? "",
+      date: eventToDelete.date,
+      meetingLink: eventToDelete.meetingLink ?? null,
+      teamMember: eventToDelete.teamMember ?? null,
+      duration: eventToDelete.duration ?? null,
+      startTime: eventToDelete.startTime ?? null,
+      endTime: eventToDelete.endTime ?? null,
+      bookingTime: eventToDelete.bookingTime ?? eventToDelete.originalBookingTime ?? null,
+      customerName: eventToDelete.customerName ?? null,
+      customerEmail: eventToDelete.customerEmail ?? null,
+      phoneNumber: eventToDelete.phoneNumber ?? null,
+      paymentStatus: eventToDelete.paymentStatus ?? null,
+      isActive: eventToDelete.isActive ?? true,
+    };
+    setDeletingEventId(eventToDelete.id);
+    try {
+      const response = await fetch("https://n8n.srv898271.hstgr.cloud/webhook/delete-client-meeting", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ event: fullEventObject }),
+      });
+      if (!response.ok) {
+        throw new Error(`Delete webhook responded with status ${response.status}`);
       }
-    },
-    []
-  );
+      toast.success("Event deleted successfully.");
+      setIsDeleteModalOpen(false);
+      setEventToDelete(null);
+    } catch (error) {
+      console.error("Error deleting event:", error);
+      toast.error("Error deleting event. Please try again.");
+    } finally {
+      setDeletingEventId(null);
+    }
+  }, [eventToDelete]);
 
   const handleAddAppointment = useCallback(
     async (values: AppointmentFormValues): Promise<void> => {
@@ -726,9 +732,7 @@ const Index = () => {
               </div>
               <span className="text-xl font-semibold text-[#5f6368] truncate">Calendar</span>
             </div>
-            {teamMember && (
-              <span className="text-sm text-[#5f6368] flex-shrink-0 px-2">{teamMember}</span>
-            )}
+            
             {isAdmin && (
               <Select
                 value={selectedTeamMemberFilter || "all"}
@@ -750,6 +754,9 @@ const Index = () => {
               </Select>
             )}
             <div className="flex items-center gap-2 flex-shrink-0 ml-auto">
+              {teamMember && (
+                <span className="text-sm text-[#5f6368] flex-shrink-0">{teamMember}</span>
+              )}
               <Button
                 type="button"
                 variant="ghost"
@@ -781,6 +788,7 @@ const Index = () => {
               onClose={closeSidebar}
               isDesktop
               isCollapsed={isSidebarCollapsed}
+              deletingEventId={deletingEventId}
             />
           )}
 
@@ -804,6 +812,7 @@ const Index = () => {
                     onDeleteEvent={handleDeleteEvent}
                     teamMemberColors={teamMemberColors}
                     isAdmin={isAdmin}
+                    deletingEventId={deletingEventId}
                   />
                 </div>
               </>
@@ -869,6 +878,7 @@ const Index = () => {
                     onDeleteEvent={handleDeleteEvent}
                     teamMemberColors={teamMemberColors}
                     isAdmin={isAdmin}
+                    deletingEventId={deletingEventId}
                   />
                 </div>
               </div>
@@ -886,6 +896,7 @@ const Index = () => {
                 onEventClick={showEventDetails}
                 onCreateAppointment={() => openAppointmentModal(currentDate)}
                 onDeleteEvent={handleDeleteEvent}
+                deletingEventId={deletingEventId}
               />
             )}
           </main>
@@ -914,6 +925,7 @@ const Index = () => {
             onClose={closeSidebar}
             isDesktop={false}
             isCollapsed={false}
+            deletingEventId={deletingEventId}
           />
         </>
       )}
@@ -940,6 +952,17 @@ const Index = () => {
           setIsDetailsModalOpen(false);
           setSelectedEvent(null);
         }}
+      />
+
+      <DeleteEventModal
+        isOpen={isDeleteModalOpen}
+        onClose={() => {
+          if (deletingEventId) return;
+          setIsDeleteModalOpen(false);
+          setEventToDelete(null);
+        }}
+        onConfirm={confirmDelete}
+        eventTitle={eventToDelete?.title}
       />
 
       {isMobileEventsSheetOpen && (
@@ -994,7 +1017,9 @@ const Index = () => {
                   return (
                     <div
                       key={event.id}
-                      className="relative rounded-2xl border border-[#e0e3eb] p-4 shadow-sm"
+                      className={`relative rounded-2xl border border-[#e0e3eb] p-4 shadow-sm ${
+                        deletingEventId === event.id ? "opacity-50 pointer-events-none" : ""
+                      }`}
                       style={{
                         borderLeft: `5px solid ${accent}`,
                         backgroundColor: hexToRgba(accent, 0.08),
@@ -1003,16 +1028,27 @@ const Index = () => {
                       <button
                         type="button"
                         aria-label="Delete event"
-                        className="absolute top-3 right-3 rounded-full p-1.5 text-[#d93025] hover:bg-[#fdecea] transition"
+                        className={`absolute top-3 right-3 rounded-full p-1.5 transition ${
+                          deletingEventId === event.id ? "opacity-50 pointer-events-none" : ""
+                        }`}
                         onClick={(e) => {
                           e.stopPropagation();
                           handleDeleteEvent(event);
                         }}
                       >
-                        <Trash2 className="h-4 w-4" />
+                        {deletingEventId === event.id ? (
+                          <svg className="h-4 w-4 animate-spin text-[#9aa0a6]" viewBox="0 0 24 24">
+                            <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" opacity="0.25" />
+                            <path d="M22 12a10 10 0 0 1-10 10" stroke="currentColor" strokeWidth="4" fill="none" opacity="0.75" />
+                          </svg>
+                        ) : (
+                          <Trash2 className="h-4 w-4 text-[#9aa0a6] hover:text-[#d93025]" />
+                        )}
                       </button>
                       <p className="text-base font-semibold text-[#202124] mb-1">{event.title || "Untitled Event"}</p>
-                      <p className="text-sm text-[#5f6368] mb-2">Customer: {event.customerName ?? "Not provided"}</p>
+                      <p className="text-sm text-[#5f6368] mb-2">
+                        Customer: {(!event.customerName?.trim() || !event.customerEmail?.trim()) ? "No customer details provided" : event.customerName}
+                      </p>
                       <div className="text-sm text-[#202124] flex flex-wrap gap-x-4 gap-y-1 mb-3">
                         <span>
                           Time: {startTime}
@@ -1025,7 +1061,8 @@ const Index = () => {
                           href={event.meetingLink}
                           target="_blank"
                           rel="noreferrer"
-                          className="text-sm text-[#1a73e8] font-medium hover:underline"
+                          className="absolute bottom-4 right-4 text-sm text-[#1a73e8] font-medium hover:underline"
+                          onClick={(e) => e.stopPropagation()}
                         >
                           Join meeting
                         </a>

@@ -10,6 +10,7 @@ interface CalendarGridProps {
   onDeleteEvent: (event: CalendarEvent) => void;
   teamMemberColors?: Map<string, string>;
   isAdmin?: boolean;
+  deletingEventId?: string | null;
 }
 
 const CalendarGrid = ({
@@ -20,6 +21,7 @@ const CalendarGrid = ({
   onDeleteEvent,
   teamMemberColors,
   isAdmin = false,
+  deletingEventId,
 }: CalendarGridProps) => {
   // Get color for event based on team member
   const getEventColor = (event: CalendarEvent): { bg: string; border: string; text: string } => {
@@ -156,7 +158,9 @@ const CalendarGrid = ({
                         return (
                           <div
                             key={event.id}
-                            className="rounded-lg px-2 py-1 text-[11px] font-medium line-clamp-2 cursor-pointer hover:opacity-80 transition-opacity sm:text-xs"
+                            className={`relative rounded-lg px-2 py-1 text-[11px] font-medium line-clamp-2 cursor-pointer hover:opacity-80 transition-opacity sm:text-xs ${
+                              deletingEventId === event.id ? "opacity-50 pointer-events-none" : ""
+                            }`}
                             style={{
                               backgroundColor: colors.bg,
                               borderColor: colors.border,
@@ -175,13 +179,20 @@ const CalendarGrid = ({
                               <button
                                 type="button"
                                 aria-label="Delete event"
-                                className="rounded-full p-0.5 text-[#d93025] hover:bg-[#fdecea]"
+                                className="rounded-full p-0.5"
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   onDeleteEvent(event);
                                 }}
                               >
-                                <Trash2 className="h-3.5 w-3.5" />
+                                {deletingEventId === event.id ? (
+                                  <svg className="h-3.5 w-3.5 animate-spin text-[#9aa0a6]" viewBox="0 0 24 24">
+                                    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" opacity="0.25" />
+                                    <path d="M22 12a10 10 0 0 1-10 10" stroke="currentColor" strokeWidth="4" fill="none" opacity="0.75" />
+                                  </svg>
+                                ) : (
+                                  <Trash2 className="h-3.5 w-3.5 text-[#9aa0a6] hover:text-[#d93025]" />
+                                )}
                               </button>
                             </div>
                           </div>

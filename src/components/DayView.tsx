@@ -1,10 +1,11 @@
 import { useMemo } from "react";
 import { CalendarEvent } from "@/pages/Index";
-import { Video, Trash2 } from "lucide-react";
+import { Trash2 } from "lucide-react";
 import {
   getCustomerEmailDisplay,
   getEventDisplayTitle,
 } from "@/lib/eventDisplay";
+import { CUSTOMER_NAME_FALLBACK } from "@/lib/eventDisplay";
 
 interface DayViewProps {
   date: Date;
@@ -13,6 +14,7 @@ interface DayViewProps {
   onDeleteEvent: (event: CalendarEvent) => void;
   teamMemberColors?: Map<string, string>;
   isAdmin?: boolean;
+  deletingEventId?: string | null;
 }
 
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
@@ -55,6 +57,7 @@ export default function DayView({
   onDeleteEvent,
   teamMemberColors,
   isAdmin,
+  deletingEventId,
 }: DayViewProps) {
   const dateHeader = useMemo(
     () =>
@@ -176,7 +179,9 @@ export default function DayView({
                       return (
                         <div
                           key={ev.id}
-                          className="absolute left-2 right-2 rounded-md shadow-sm border-l-4 cursor-pointer hover:shadow-md"
+                          className={`absolute left-2 right-2 rounded-md shadow-sm border-l-4 cursor-pointer hover:shadow-md ${
+                            deletingEventId === ev.id ? "opacity-50 pointer-events-none" : ""
+                          }`}
                           style={{
                             top,
                             height,
@@ -195,13 +200,20 @@ export default function DayView({
                               <button
                                 type="button"
                                 aria-label="Delete event"
-                                className="rounded-full p-1 text-[#d93025] hover:bg-[#fdecea]"
+                                className="rounded-full p-1"
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   onDeleteEvent(ev);
                                 }}
                               >
-                                <Trash2 className="h-3.5 w-3.5" />
+                                {deletingEventId === ev.id ? (
+                                  <svg className="h-3.5 w-3.5 animate-spin text-[#9aa0a6]" viewBox="0 0 24 24">
+                                    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" opacity="0.25" />
+                                    <path d="M22 12a10 10 0 0 1-10 10" stroke="currentColor" strokeWidth="4" fill="none" opacity="0.75" />
+                                  </svg>
+                                ) : (
+                                  <Trash2 className="h-3.5 w-3.5 text-[#9aa0a6] hover:text-[#d93025]" />
+                                )}
                               </button>
                             </div>
 
@@ -210,7 +222,7 @@ export default function DayView({
                             </div>
 
                             <div className="text-[11px] text-[#5f6368]">
-                              Email: {emailLabel}
+                              {(!ev.customerName?.trim() || !ev.customerEmail?.trim()) ? CUSTOMER_NAME_FALLBACK : `Email: ${emailLabel}`}
                             </div>
 
                             {ev.teamMember && (
@@ -219,9 +231,7 @@ export default function DayView({
                               </div>
                             )}
 
-                            {ev.meetingLink && (
-                              <Video className="h-3 w-3 mt-auto text-[#5f6368]" />
-                            )}
+                            
                           </div>
                         </div>
                       );

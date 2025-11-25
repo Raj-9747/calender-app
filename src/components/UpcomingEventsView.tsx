@@ -47,6 +47,7 @@ interface UpcomingEventsViewProps {
   onEventClick: (event: CalendarEvent) => void;
   onCreateAppointment: () => void;
   onDeleteEvent: (event: CalendarEvent) => void;
+  deletingEventId?: string | null;
 }
 
 const startOfDay = (date: Date) => {
@@ -125,6 +126,7 @@ const UpcomingEventsView = ({
   onEventClick,
   onCreateAppointment,
   onDeleteEvent,
+  deletingEventId,
 }: UpcomingEventsViewProps) => {
   const [searchTerm, setSearchTerm] = useState("");
 
@@ -266,10 +268,13 @@ const UpcomingEventsView = ({
                       const customerEmail = getCustomerEmailDisplay(event);
                       const customerPhone = getCustomerPhoneDisplay(event);
                       const displayTitle = getEventDisplayTitle(event);
+                      const missingDetails = !event.customerName?.trim() || !event.customerEmail?.trim();
                       return (
                         <div
                           key={event.id}
-                          className="relative rounded-3xl border border-[#e0e3eb] bg-white p-5 shadow-[0_8px_30px_rgba(15,23,42,0.06)] transition-all duration-200 hover:-translate-y-1 hover:shadow-[0_15px_35px_rgba(15,23,42,0.15)] cursor-pointer"
+                          className={`relative rounded-3xl border border-[#e0e3eb] bg-white p-5 shadow-[0_8px_30px_rgba(15,23,42,0.06)] transition-all duration-200 hover:-translate-y-1 hover:shadow-[0_15px_35px_rgba(15,23,42,0.15)] cursor-pointer ${
+                            deletingEventId === event.id ? "opacity-50 pointer-events-none" : ""
+                          }`}
                           style={{ borderLeft: `6px solid ${accent}` }}
                           onClick={() => onEventClick(event)}
                           title={`${displayTitle}\nEmail: ${customerEmail}`}
@@ -277,13 +282,20 @@ const UpcomingEventsView = ({
                           <button
                             type="button"
                             aria-label="Delete event"
-                            className="absolute top-5 right-5 rounded-full p-1.5 text-[#d93025] hover:bg-[#fdecea]"
+                            className="absolute top-5 right-5 rounded-full p-1.5"
                             onClick={(e) => {
                               e.stopPropagation();
                               onDeleteEvent(event);
                             }}
                           >
-                            <Trash2 className="h-4 w-4" />
+                            {deletingEventId === event.id ? (
+                              <svg className="h-4 w-4 animate-spin text-[#9aa0a6]" viewBox="0 0 24 24">
+                                <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" opacity="0.25" />
+                                <path d="M22 12a10 10 0 0 1-10 10" stroke="currentColor" strokeWidth="4" fill="none" opacity="0.75" />
+                              </svg>
+                            ) : (
+                              <Trash2 className="h-4 w-4 text-[#9aa0a6] hover:text-[#d93025]" />
+                            )}
                           </button>
                           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                             <div className="space-y-2 flex-1">
@@ -292,10 +304,10 @@ const UpcomingEventsView = ({
                               </div>
                               <p className="text-lg font-semibold text-[#202124]">{displayTitle}</p>
                               <p className="text-sm text-[#5f6368]">
-                                Customer Name: {customerName}
+                                {missingDetails ? "No customer details provided" : `Customer Name: ${customerName}`}
                               </p>
                               <p className="text-sm text-[#5f6368]">
-                                Email: {customerEmail}
+                                {missingDetails ? "No customer details provided" : `Email: ${customerEmail}`}
                               </p>
                               <p className="text-sm text-[#5f6368]">
                                 Phone: {customerPhone}
@@ -304,24 +316,7 @@ const UpcomingEventsView = ({
                                 <p className="text-sm text-[#5f6368] line-clamp-2">{event.description}</p>
                               )}
                             </div>
-
-                            <div className="flex flex-col items-start gap-2 text-sm text-[#5f6368] lg:items-end">
-                              {timeRange && <span className="font-semibold text-[#1a73e8]">{timeRange}</span>}
-                              <span>{duration} mins</span>
-                              {event.meetingLink && (
-                                <a
-                                  href={event.meetingLink}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  className="inline-flex items-center text-[#1a73e8] hover:text-[#155fc8]"
-                                  onClick={(e) => e.stopPropagation()}
-                                >
-                                  <Video className="mr-1 h-4 w-4" />
-                                  Join link
-                                  <ExternalLink className="ml-1 h-3 w-3" />
-                                </a>
-                              )}
-                            </div>
+                            <div className="flex flex-col items-start gap-2 text-sm text-[#5f6368] lg:items-end"></div>
                           </div>
 
                           <div className="mt-4 flex flex-wrap items-center gap-3">
@@ -330,6 +325,19 @@ const UpcomingEventsView = ({
                               {timeRange ?? "Time TBD"}
                             </span>
                             <span className="text-xs text-[#5f6368]">{duration} minute event</span>
+                            {event.meetingLink && (
+                              <a
+                                href={event.meetingLink}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="ml-auto inline-flex items-center text-[#1a73e8] hover:text-[#155fc8]"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <Video className="mr-1 h-4 w-4" />
+                                Join link
+                                <ExternalLink className="ml-1 h-3 w-3" />
+                              </a>
+                            )}
                             {isAdmin && event.teamMember && (
                               <Badge
                                 className="border-0 px-3 text-xs"

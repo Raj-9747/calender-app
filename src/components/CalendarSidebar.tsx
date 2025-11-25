@@ -24,6 +24,7 @@ interface CalendarSidebarProps {
   onClose: () => void;
   isDesktop?: boolean;
   isCollapsed?: boolean;
+  deletingEventId?: string | null;
 }
 
 const DISPLAY_TIMEZONE = "UTC";
@@ -42,6 +43,7 @@ const CalendarSidebar = ({
   onClose,
   isDesktop = false,
   isCollapsed = false,
+  deletingEventId,
 }: CalendarSidebarProps) => {
   const startOfToday = useMemo(() => {
     const today = new Date();
@@ -220,16 +222,19 @@ const CalendarSidebar = ({
             const displayTitle = getEventDisplayTitle(event);
             const customerName = getCustomerNameDisplay(event);
             const customerEmail = getCustomerEmailDisplay(event);
+            const missingDetails = !event.customerName?.trim() || !event.customerEmail?.trim();
             return (
                 <div
                   key={event.id}
-              className="
+              className={`
                 relative group rounded-3xl border border-[#e0e3eb] 
                 bg-white px-5 py-4 
                 shadow-[0_5px_15px_rgba(15,23,42,0.05)] 
                 transition-all duration-200 cursor-pointer 
-                hover:-translate-y-0.5 hover:shadow-[0_15px_30px_rgba(15,23,42,0.12)]
-              "
+                hover:-translate-y-0.5 hover:shadow-[0_15px_30px_rgba(15,23,42,0.12)] ${
+                  deletingEventId === event.id ? "opacity-50 pointer-events-none" : ""
+                }
+              `}
               style={{ borderLeft: `5px solid ${getEventAccent(event)}` }}
                   onClick={() => runActionAndCollapse(() => onEventClick(event))}
               title={`${displayTitle}\nEmail: ${customerEmail}`}
@@ -237,13 +242,20 @@ const CalendarSidebar = ({
               <button
                 type="button"
                 aria-label="Delete event"
-                className="absolute top-4 right-4 rounded-full p-1.5 text-[#d93025] hover:bg-[#fdecea] transition"
+                className="absolute top-4 right-4 rounded-full p-1.5"
                 onClick={(e) => {
                   e.stopPropagation();
                   onDeleteEvent(event);
                 }}
               >
-                <Trash2 className="h-4 w-4" />
+                {deletingEventId === event.id ? (
+                  <svg className="h-4 w-4 animate-spin text-[#9aa0a6]" viewBox="0 0 24 24">
+                    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" opacity="0.25" />
+                    <path d="M22 12a10 10 0 0 1-10 10" stroke="currentColor" strokeWidth="4" fill="none" opacity="0.75" />
+                  </svg>
+                ) : (
+                  <Trash2 className="h-4 w-4 text-[#9aa0a6] hover:text-[#d93025]" />
+                )}
               </button>
               <div className="flex items-center gap-2 text-sm font-semibold text-[#202124] tracking-tight">
                 <Clock8 className="h-4 w-4 text-[#1a73e8]" />
@@ -264,8 +276,8 @@ const CalendarSidebar = ({
                 )}
 
                 <div className="text-sm text-[#5f6368] leading-relaxed">
-                  <p>Customer Name: {customerName}</p>
-                  <p className="text-xs">Email: {customerEmail}</p>
+                  <p>{missingDetails ? "No customer details provided" : `Customer Name: ${customerName}`}</p>
+                  <p className="text-xs">{missingDetails ? "No customer details provided" : `Email: ${customerEmail}`}</p>
                 </div>
 
                 {event.description && (
@@ -274,6 +286,7 @@ const CalendarSidebar = ({
                   </p>
                 )}
               </div>
+              
             </div>
           );})}
         </div>
