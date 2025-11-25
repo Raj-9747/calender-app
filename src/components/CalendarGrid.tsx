@@ -1,11 +1,13 @@
 import { CalendarEvent } from "@/pages/Index";
 import { getCustomerEmailDisplay, getEventDisplayTitle } from "@/lib/eventDisplay";
+import { Trash2 } from "lucide-react";
 
 interface CalendarGridProps {
   currentDate: Date;
   onDateClick: (date: Date) => void;
   renderEvents: (date: Date) => CalendarEvent[];
   onEventClick: (event: CalendarEvent) => void;
+  onDeleteEvent: (event: CalendarEvent) => void;
   teamMemberColors?: Map<string, string>;
   isAdmin?: boolean;
 }
@@ -15,6 +17,7 @@ const CalendarGrid = ({
   onDateClick,
   renderEvents,
   onEventClick,
+  onDeleteEvent,
   teamMemberColors,
   isAdmin = false,
 }: CalendarGridProps) => {
@@ -167,7 +170,20 @@ const CalendarGrid = ({
                             }}
                             title={`${displayTitle}\nEmail: ${emailDisplay}`}
                           >
-                            {displayTitle}
+                            <div className="flex items-center gap-1">
+                              <span className="flex-1 truncate">{displayTitle}</span>
+                              <button
+                                type="button"
+                                aria-label="Delete event"
+                                className="rounded-full p-0.5 text-[#d93025] hover:bg-[#fdecea]"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onDeleteEvent(event);
+                                }}
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
                           </div>
                         );
                       })}

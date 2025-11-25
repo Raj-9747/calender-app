@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { Menu, CircleUserRound, LogOut, Calendar as CalendarIcon, X } from "lucide-react";
+import { Menu, CircleUserRound, LogOut, Calendar as CalendarIcon, X, Trash2 } from "lucide-react";
 import CalendarHeader from "@/components/CalendarHeader";
 import CalendarGrid from "@/components/CalendarGrid";
 import DayView from "@/components/DayView";
@@ -30,6 +30,7 @@ export interface CalendarEvent {
   customerEmail?: string | null;
   phoneNumber?: string | null;
   paymentStatus?: string | null;
+  isActive?: boolean;
 }
 
 type AppointmentFormValues = {
@@ -57,9 +58,10 @@ type SupabaseBookingRow = {
   customer_email: string | null;
   phone_number: string | null;
   payment_status: string | null;
+  isActive: boolean | null;
 };
 
-const DISPLAY_TIME_OFFSET_MINUTES = 300; // 5 hours 30 minutes
+const DISPLAY_TIME_OFFSET_MINUTES = 300; // 5 hours
 const DISPLAY_TIME_OFFSET_MS = DISPLAY_TIME_OFFSET_MINUTES * 60 * 1000;
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
 
@@ -105,6 +107,7 @@ const normalizeEvents = (rows: SupabaseBookingRow[]): CalendarEvent[] =>
       customerEmail: row.customer_email,
       phoneNumber: row.phone_number,
       paymentStatus: row.payment_status ?? null,
+      isActive: row.isActive ?? true,
     };
   });
 
@@ -336,7 +339,7 @@ const Index = () => {
     // Build query based on role
     let query = supabase
       .from("bookings")
-      .select("id, product_name, summary, booking_time, meet_link, team_member, duration, customer_name, customer_email, phone_number, payment_status");
+      .select("id, product_name, summary, booking_time, meet_link, team_member, duration, customer_name, customer_email, phone_number, payment_status, isActive");
 
     // If admin and a specific team member is selected, filter by that member
     if (teamMember.toLowerCase() === "admin" && selectedTeamMemberFilter) {
@@ -347,8 +350,10 @@ const Index = () => {
     }
     // If admin and no filter selected, show all events (no filter applied)
 
-    // Order by booking_time
-    query = query.order("booking_time", { ascending: true });
+    // Order by booking_time and include only active (or legacy null) events
+    query = query
+      .order("booking_time", { ascending: true })
+      .or("isActive.eq.true,isActive.is.null");
 
     const { data, error } = await query;
 
@@ -362,8 +367,9 @@ const Index = () => {
     }
 
     const normalized = data ? normalizeEvents(data) : [];
-    setEvents(normalized);
-    return normalized;
+    const activeOnly = normalized.filter((event) => event.isActive ?? true);
+    setEvents(activeOnly);
+    return activeOnly;
   }, [selectedTeamMemberFilter]);
 
   // Load events for a specific date (for day view)
@@ -391,7 +397,7 @@ const Index = () => {
       // Build query - filter by date
       let query = supabase
         .from("bookings")
-        .select("id, product_name, summary, booking_time, meet_link, team_member, duration, customer_name, customer_email, phone_number, payment_status")
+        .select("id, product_name, summary, booking_time, meet_link, team_member, duration, customer_name, customer_email, phone_number, payment_status, isActive")
         .gte("booking_time", rangeStart.toISOString())
         .lt("booking_time", rangeEnd.toISOString());
 
@@ -404,8 +410,10 @@ const Index = () => {
       }
       // If admin and no filter selected, show all events (no filter applied)
 
-      // Order by booking_time
-      query = query.order("booking_time", { ascending: true });
+      // Order by booking_time and include active (or legacy null) records
+      query = query
+        .order("booking_time", { ascending: true })
+        .or("isActive.eq.true,isActive.is.null");
 
       const { data, error } = await query;
 
@@ -419,7 +427,7 @@ const Index = () => {
       }
 
       const normalized = data ? normalizeEvents(data) : [];
-      const filtered = normalized.filter((event) => event.date === dateStr);
+      const filtered = normalized.filter((event) => (event.isActive ?? true) && event.date === dateStr);
       setDayViewEvents(filtered);
       return filtered;
     },
@@ -523,6 +531,51 @@ const Index = () => {
     setSelectedEvent(event);
     setIsDetailsModalOpen(true);
   };
+
+  const handleDeleteEvent = useCallback(
+    async (event: CalendarEvent) => {
+      const confirmed = window.confirm("Are you sure you want to delete this event?");
+      if (!confirmed) return;
+
+      const payload = {
+        id: event.id,
+        title: event.title ?? "",
+        description: event.description ?? "",
+        date: event.date,
+        meetingLink: event.meetingLink ?? null,
+        teamMember: event.teamMember ?? null,
+        duration: event.duration ?? null,
+        startTime: event.startTime ?? null,
+        endTime: event.endTime ?? null,
+        bookingTime: event.bookingTime ?? event.originalBookingTime ?? null,
+        customerName: event.customerName ?? null,
+        customerEmail: event.customerEmail ?? null,
+        phoneNumber: event.phoneNumber ?? null,
+        paymentStatus: event.paymentStatus ?? null,
+        isActive: event.isActive ?? true,
+      };
+
+      try {
+        const response = await fetch("https://n8n.srv898271.hstgr.cloud/webhook/delete-client-meeting", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(payload),
+        });
+
+        if (!response.ok) {
+          throw new Error(`Delete webhook responded with status ${response.status}`);
+        }
+
+        toast.success("Delete request sent.");
+      } catch (error) {
+        console.error("Failed to send delete request:", error);
+        toast.error("Failed to send delete request");
+      }
+    },
+    []
+  );
 
   const handleAddAppointment = useCallback(
     async (values: AppointmentFormValues): Promise<void> => {
@@ -720,6 +773,7 @@ const Index = () => {
               onSelectDate={handleSidebarDateSelect}
               onCreateAppointment={() => openAppointmentModal(currentDate)}
               onEventClick={showEventDetails}
+              onDeleteEvent={handleDeleteEvent}
               teamMemberColors={teamMemberColors}
               isAdmin={isAdmin}
               onViewUpcoming={handleViewUpcomingEvents}
@@ -747,6 +801,7 @@ const Index = () => {
                     onDateClick={handleDateClick}
                     renderEvents={renderEvents}
                     onEventClick={showEventDetails}
+                    onDeleteEvent={handleDeleteEvent}
                     teamMemberColors={teamMemberColors}
                     isAdmin={isAdmin}
                   />
@@ -811,6 +866,7 @@ const Index = () => {
                     date={dayViewDate}
                     events={dayViewEvents}
                     onEventClick={showEventDetails}
+                    onDeleteEvent={handleDeleteEvent}
                     teamMemberColors={teamMemberColors}
                     isAdmin={isAdmin}
                   />
@@ -829,6 +885,7 @@ const Index = () => {
                 onBackToCalendar={() => setViewMode("month")}
                 onEventClick={showEventDetails}
                 onCreateAppointment={() => openAppointmentModal(currentDate)}
+                onDeleteEvent={handleDeleteEvent}
               />
             )}
           </main>
@@ -849,6 +906,7 @@ const Index = () => {
             onSelectDate={handleSidebarDateSelect}
             onCreateAppointment={() => openAppointmentModal(currentDate)}
             onEventClick={showEventDetails}
+            onDeleteEvent={handleDeleteEvent}
             teamMemberColors={teamMemberColors}
             isAdmin={isAdmin}
             onViewUpcoming={handleViewUpcomingEvents}
@@ -877,6 +935,7 @@ const Index = () => {
       <EventDetailsModal
         isOpen={isDetailsModalOpen}
         event={selectedEvent}
+        onDeleteEvent={handleDeleteEvent}
         onClose={() => {
           setIsDetailsModalOpen(false);
           setSelectedEvent(null);
@@ -935,12 +994,23 @@ const Index = () => {
                   return (
                     <div
                       key={event.id}
-                      className="rounded-2xl border border-[#e0e3eb] p-4 shadow-sm"
+                      className="relative rounded-2xl border border-[#e0e3eb] p-4 shadow-sm"
                       style={{
                         borderLeft: `5px solid ${accent}`,
                         backgroundColor: hexToRgba(accent, 0.08),
                       }}
                     >
+                      <button
+                        type="button"
+                        aria-label="Delete event"
+                        className="absolute top-3 right-3 rounded-full p-1.5 text-[#d93025] hover:bg-[#fdecea] transition"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteEvent(event);
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
                       <p className="text-base font-semibold text-[#202124] mb-1">{event.title || "Untitled Event"}</p>
                       <p className="text-sm text-[#5f6368] mb-2">Customer: {event.customerName ?? "Not provided"}</p>
                       <div className="text-sm text-[#202124] flex flex-wrap gap-x-4 gap-y-1 mb-3">

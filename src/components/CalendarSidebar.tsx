@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { Plus, Clock8, CalendarClock, X } from "lucide-react";
+import { Plus, Clock8, CalendarClock, X, Trash2 } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import { Button } from "@/components/ui/button";
 import type { CalendarEvent } from "@/pages/Index";
@@ -16,6 +16,7 @@ interface CalendarSidebarProps {
   onSelectDate: (date: Date) => void;
   onCreateAppointment: () => void;
   onEventClick: (event: CalendarEvent) => void;
+  onDeleteEvent: (event: CalendarEvent) => void;
   teamMemberColors?: Map<string, string>;
   isAdmin?: boolean;
   onViewUpcoming: () => void;
@@ -33,6 +34,7 @@ const CalendarSidebar = ({
   onSelectDate,
   onCreateAppointment,
   onEventClick,
+  onDeleteEvent,
   teamMemberColors,
   isAdmin = false,
   onViewUpcoming,
@@ -222,7 +224,7 @@ const CalendarSidebar = ({
                 <div
                   key={event.id}
               className="
-                group rounded-3xl border border-[#e0e3eb] 
+                relative group rounded-3xl border border-[#e0e3eb] 
                 bg-white px-5 py-4 
                 shadow-[0_5px_15px_rgba(15,23,42,0.05)] 
                 transition-all duration-200 cursor-pointer 
@@ -232,6 +234,17 @@ const CalendarSidebar = ({
                   onClick={() => runActionAndCollapse(() => onEventClick(event))}
               title={`${displayTitle}\nEmail: ${customerEmail}`}
             >
+              <button
+                type="button"
+                aria-label="Delete event"
+                className="absolute top-4 right-4 rounded-full p-1.5 text-[#d93025] hover:bg-[#fdecea] transition"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDeleteEvent(event);
+                }}
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
               <div className="flex items-center gap-2 text-sm font-semibold text-[#202124] tracking-tight">
                 <Clock8 className="h-4 w-4 text-[#1a73e8]" />
                 <span className="text-base font-semibold">

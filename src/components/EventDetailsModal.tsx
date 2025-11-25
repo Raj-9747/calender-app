@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { X, Video, Clock, User } from "lucide-react";
+import { X, Video, Clock, User, Trash2 } from "lucide-react";
 import { CalendarEvent } from "@/pages/Index";
 import {
   getCustomerEmailDisplay,
@@ -12,11 +12,12 @@ interface EventDetailsModalProps {
   isOpen: boolean;
   event: CalendarEvent | null;
   onClose: () => void;
+  onDeleteEvent: (event: CalendarEvent) => void;
 }
 
 const DISPLAY_TIMEZONE = "UTC";
 
-const EventDetailsModal = ({ isOpen, event, onClose }: EventDetailsModalProps) => {
+const EventDetailsModal = ({ isOpen, event, onClose, onDeleteEvent }: EventDetailsModalProps) => {
   const formatDateDisplay = (dateStr: string): string => {
     const date = new Date(dateStr + "T00:00:00");
     const options: Intl.DateTimeFormatOptions = {
@@ -178,7 +179,15 @@ const EventDetailsModal = ({ isOpen, event, onClose }: EventDetailsModalProps) =
         )}
 
         {/* Close Button */}
-        <div className="flex justify-end">
+        <div className="flex justify-end gap-2">
+          <Button
+            variant="destructive"
+            className="flex items-center gap-2"
+            onClick={() => event && onDeleteEvent(event)}
+          >
+            <Trash2 className="h-4 w-4" />
+            Delete
+          </Button>
           <Button variant="outline" className="hover:bg-secondary" onClick={onClose}>
             Close
           </Button>

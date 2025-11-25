@@ -17,6 +17,7 @@ import {
   ExternalLink,
   ArrowLeft,
   UserCircle2,
+  Trash2,
 } from "lucide-react";
 import {
   getCustomerEmailDisplay,
@@ -45,6 +46,7 @@ interface UpcomingEventsViewProps {
   onBackToCalendar: () => void;
   onEventClick: (event: CalendarEvent) => void;
   onCreateAppointment: () => void;
+  onDeleteEvent: (event: CalendarEvent) => void;
 }
 
 const startOfDay = (date: Date) => {
@@ -122,6 +124,7 @@ const UpcomingEventsView = ({
   onBackToCalendar,
   onEventClick,
   onCreateAppointment,
+  onDeleteEvent,
 }: UpcomingEventsViewProps) => {
   const [searchTerm, setSearchTerm] = useState("");
 
@@ -266,11 +269,22 @@ const UpcomingEventsView = ({
                       return (
                         <div
                           key={event.id}
-                          className="rounded-3xl border border-[#e0e3eb] bg-white p-5 shadow-[0_8px_30px_rgba(15,23,42,0.06)] transition-all duration-200 hover:-translate-y-1 hover:shadow-[0_15px_35px_rgba(15,23,42,0.15)] cursor-pointer"
+                          className="relative rounded-3xl border border-[#e0e3eb] bg-white p-5 shadow-[0_8px_30px_rgba(15,23,42,0.06)] transition-all duration-200 hover:-translate-y-1 hover:shadow-[0_15px_35px_rgba(15,23,42,0.15)] cursor-pointer"
                           style={{ borderLeft: `6px solid ${accent}` }}
                           onClick={() => onEventClick(event)}
                           title={`${displayTitle}\nEmail: ${customerEmail}`}
                         >
+                          <button
+                            type="button"
+                            aria-label="Delete event"
+                            className="absolute top-5 right-5 rounded-full p-1.5 text-[#d93025] hover:bg-[#fdecea]"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onDeleteEvent(event);
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
                           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                             <div className="space-y-2 flex-1">
                               <div className="text-xs uppercase tracking-[0.2em] text-[#9aa0a6]">
