@@ -27,6 +27,7 @@ interface AppointmentScheduleModalProps {
     duration: string;
     meetingLink: string;
     description: string;
+    typeOfMeeting?: string;
     teamMember?: string;
   }) => Promise<void>;
   isSaving: boolean;
@@ -54,6 +55,7 @@ const AppointmentScheduleModal = ({
   const [duration, setDuration] = useState("60");
   const [meetingLink, setMeetingLink] = useState("");
   const [description, setDescription] = useState("");
+  const [typeOfMeeting, setTypeOfMeeting] = useState("");
   const [selectedTeamMember, setSelectedTeamMember] = useState("");
   const mergedTeamMembers = useMemo(
     () => Array.from(new Set([...defaultTeamMembers, ...teamMembers])),
@@ -77,6 +79,7 @@ const AppointmentScheduleModal = ({
       setDuration("60");
       setMeetingLink("");
       setDescription("");
+      setTypeOfMeeting("");
       setSelectedTeamMember("");
       return;
     }
@@ -102,6 +105,7 @@ const AppointmentScheduleModal = ({
         duration,
         meetingLink,
         description,
+        typeOfMeeting,
         teamMember: isAdmin ? selectedTeamMember : undefined,
       });
     } catch (error) {
@@ -214,6 +218,22 @@ const AppointmentScheduleModal = ({
               />
             </div>
 
+              <div>
+                <label className="mb-1 block text-sm font-medium text-[#5f6368]">Type of Meeting</label>
+                <Select
+                  value={typeOfMeeting || undefined}
+                  onValueChange={(value) => setTypeOfMeeting(value)}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select meeting type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="On Call">On Call</SelectItem>
+                    <SelectItem value="In Person">In Person</SelectItem>
+                    <SelectItem value="On Google Meet / Zoom Call">On Google Meet / Zoom Call</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             {isAdmin && (
               <div>
                 <label className="mb-1 block text-sm font-medium text-[#5f6368]">

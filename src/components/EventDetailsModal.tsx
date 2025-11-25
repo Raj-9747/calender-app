@@ -152,6 +152,14 @@ const EventDetailsModal = ({ isOpen, event, onClose, onDeleteEvent }: EventDetai
           </div>
         )}
 
+        {/* Type of Meeting */}
+        {event.typeOfMeeting && (
+          <div className="mb-6">
+            <h3 className="text-sm font-medium text-foreground mb-2">Type of Meeting</h3>
+            <p className="text-sm text-muted-foreground">{event.typeOfMeeting}</p>
+          </div>
+        )}
+
         {/* Description */}
         <div className="mb-6">
           <h3 className="text-sm font-medium text-foreground mb-2">Description</h3>
