@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { Menu, Search, CircleUserRound, LogOut, Calendar as CalendarIcon, X } from "lucide-react";
+import { Menu, CircleUserRound, LogOut, Calendar as CalendarIcon, X, Trash2 } from "lucide-react";
 import CalendarHeader from "@/components/CalendarHeader";
 import CalendarGrid from "@/components/CalendarGrid";
 import DayView from "@/components/DayView";
@@ -8,11 +8,12 @@ import UpcomingEventsView from "@/components/UpcomingEventsView";
 import EventDetailsModal from "@/components/EventDetailsModal";
 import { supabase } from "@/lib/supabaseClient";
 import CalendarSidebar from "@/components/CalendarSidebar";
-import AddTaskModal from "@/components/AddTaskModal";
 import AppointmentScheduleModal from "@/components/AppointmentScheduleModal";
+import DeleteEventModal from "@/components/DeleteEventModal";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 export interface CalendarEvent {
   id: string;
@@ -24,29 +25,14 @@ export interface CalendarEvent {
   duration?: number; // Duration in minutes
   startTime?: string; // ISO timestamp
   endTime?: string; // ISO timestamp
-  bookingTime?: string; // Original booking_time from database
+  bookingTime?: string; // Display-adjusted booking time (ISO)
+  originalBookingTime?: string; // Raw booking_time from database
   customerName?: string | null;
   customerEmail?: string | null;
   phoneNumber?: string | null;
-}
-
-export interface TaskItem {
-  id: string;
-  title: string;
-  dueDate: string;
-  notes: string;
-}
-
-export interface AppointmentSchedule {
-  id: string;
-  serviceType: string;
-  date: string;
-  time: string;
-  duration: string;
-  meetingLink: string;
-  description: string;
-  customerName: string;
-  customerEmail: string;
+  paymentStatus?: string | null;
+  typeOfMeeting?: string | null;
+  isActive?: boolean;
 }
 
 type AppointmentFormValues = {
@@ -59,6 +45,7 @@ type AppointmentFormValues = {
   duration: string;
   meetingLink: string;
   description: string;
+    typeOfMeeting?: string;
   teamMember?: string;
 };
 
@@ -73,23 +60,39 @@ type SupabaseBookingRow = {
   customer_name: string | null;
   customer_email: string | null;
   phone_number: string | null;
+  payment_status: string | null;
+  typeOfMeeting: string | null;
+  isActive: boolean | null;
+};
+
+const DISPLAY_TIME_OFFSET_MINUTES = 300; // 5 hours
+const DISPLAY_TIME_OFFSET_MS = DISPLAY_TIME_OFFSET_MINUTES * 60 * 1000;
+const DAY_IN_MS = 24 * 60 * 60 * 1000;
+
+const shiftBookingTime = (isoString?: string): Date | null => {
+  if (!isoString) return null;
+  const parsed = new Date(isoString);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return new Date(parsed.getTime() - DISPLAY_TIME_OFFSET_MS);
 };
 
 const normalizeEvents = (rows: SupabaseBookingRow[]): CalendarEvent[] =>
   rows.map((row) => {
-    // Extract date from booking_time (TIMESTAMPTZ format)
-    const bookingDate = row.booking_time ? new Date(row.booking_time) : new Date();
+    const adjustedStartDate = shiftBookingTime(row.booking_time);
+    const fallbackDate =
+      adjustedStartDate ??
+      (row.booking_time ? new Date(row.booking_time) : new Date());
     // Format date as YYYY-MM-DD
-    const year = bookingDate.getFullYear();
-    const month = String(bookingDate.getMonth() + 1).padStart(2, "0");
-    const day = String(bookingDate.getDate()).padStart(2, "0");
+    const year = fallbackDate.getFullYear();
+    const month = String(fallbackDate.getMonth() + 1).padStart(2, "0");
+    const day = String(fallbackDate.getDate()).padStart(2, "0");
     const dateStr = `${year}-${month}-${day}`;
     
     // Calculate start and end times
-    const startTime = row.booking_time;
     const duration = row.duration ?? 60; // Default to 60 minutes if not provided
-    const endTime = startTime
-      ? new Date(new Date(startTime).getTime() + duration * 60000).toISOString()
+    const startTimeISO = adjustedStartDate?.toISOString();
+    const endTimeISO = adjustedStartDate
+      ? new Date(adjustedStartDate.getTime() + duration * 60000).toISOString()
       : undefined;
     
     return {
@@ -100,21 +103,25 @@ const normalizeEvents = (rows: SupabaseBookingRow[]): CalendarEvent[] =>
       meetingLink: row.meet_link ?? "",
       teamMember: row.team_member ?? undefined,
       duration: duration,
-      startTime: startTime,
-      endTime: endTime,
-      bookingTime: row.booking_time,
+      startTime: startTimeISO,
+      endTime: endTimeISO,
+      bookingTime: startTimeISO ?? row.booking_time,
+      originalBookingTime: row.booking_time,
       customerName: row.customer_name,
       customerEmail: row.customer_email,
       phoneNumber: row.phone_number,
+      paymentStatus: row.payment_status ?? null,
+      typeOfMeeting: row.typeOfMeeting ?? null,
+      isActive: row.isActive ?? true,
     };
   });
 
-const generateId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
-
 type ViewMode = "month" | "day" | "upcoming";
+const defaultTeamMembers = ["Gauri", "Monica", "Shafoli","Farahnaz","Merilo"];
 
 const Index = () => {
   const navigate = useNavigate();
+  const isMobileViewport = useIsMobile();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("month");
@@ -124,13 +131,13 @@ const Index = () => {
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
   const [isSavingAppointment, setIsSavingAppointment] = useState(false);
-  const [tasks, setTasks] = useState<TaskItem[]>([]);
-  const [appointments, setAppointments] = useState<AppointmentSchedule[]>([]);
-  const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
   const [isAppointmentModalOpen, setIsAppointmentModalOpen] = useState(false);
   const [teamMember, setTeamMember] = useState<string | null>(null);
   const [selectedTeamMemberFilter, setSelectedTeamMemberFilter] = useState<string | null>(null);
-  const [availableTeamMembers, setAvailableTeamMembers] = useState<string[]>([]);
+  const [availableTeamMembers, setAvailableTeamMembers] = useState<string[]>(defaultTeamMembers);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [eventToDelete, setEventToDelete] = useState<CalendarEvent | null>(null);
+  const [deletingEventId, setDeletingEventId] = useState<string | null>(null);
   const [isDesktopViewport, setIsDesktopViewport] = useState<boolean>(() => {
     if (typeof window === "undefined") return true;
     return window.matchMedia("(min-width: 1024px)").matches;
@@ -140,6 +147,46 @@ const Index = () => {
     return window.matchMedia("(min-width: 1024px)").matches;
   });
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isMobileEventsSheetOpen, setIsMobileEventsSheetOpen] = useState(false);
+  const [mobileSheetEvents, setMobileSheetEvents] = useState<CalendarEvent[]>([]);
+  const [mobileSheetDate, setMobileSheetDate] = useState<Date | null>(null);
+  const [isMobileSheetVisible, setIsMobileSheetVisible] = useState(false);
+  const mobileSheetCloseTimeout = useRef<number | null>(null);
+  const MOBILE_SHEET_TRANSITION_MS = 280;
+  const getMobileEventAccent = (event: CalendarEvent): string => {
+    if (event.teamMember && teamMemberColors?.get(event.teamMember)) {
+      return teamMemberColors.get(event.teamMember)!;
+    }
+    return "#1a73e8";
+  };
+  const hexToRgba = (hex: string, alpha: number): string => {
+    const sanitized = hex.replace("#", "");
+    const bigint = Number.parseInt(sanitized, 16);
+    const r = (bigint >> 16) & 255;
+    const g = (bigint >> 8) & 255;
+    const b = bigint & 255;
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  };
+  useEffect(() => {
+    return () => {
+      if (mobileSheetCloseTimeout.current) {
+        window.clearTimeout(mobileSheetCloseTimeout.current);
+      }
+    };
+  }, []);
+  const closeMobileSheet = useCallback(() => {
+    if (!isMobileEventsSheetOpen) return;
+    setIsMobileSheetVisible(false);
+    if (mobileSheetCloseTimeout.current) {
+      window.clearTimeout(mobileSheetCloseTimeout.current);
+    }
+    mobileSheetCloseTimeout.current = window.setTimeout(() => {
+      setIsMobileEventsSheetOpen(false);
+      setMobileSheetEvents([]);
+      setMobileSheetDate(null);
+      mobileSheetCloseTimeout.current = null;
+    }, MOBILE_SHEET_TRANSITION_MS);
+  }, [isMobileEventsSheetOpen, MOBILE_SHEET_TRANSITION_MS]);
 
   // Load team member from localStorage on mount
   useEffect(() => {
@@ -194,6 +241,7 @@ const Index = () => {
 
       if (error) {
         console.error("Failed to fetch team members:", error);
+        setAvailableTeamMembers(defaultTeamMembers);
         return;
       }
 
@@ -202,9 +250,11 @@ const Index = () => {
         new Set(data.map((row) => row.team_member).filter((member): member is string => member !== null))
       ).sort();
 
-      setAvailableTeamMembers(distinctMembers);
+      const mergedMembers = Array.from(new Set([...defaultTeamMembers, ...distinctMembers]));
+      setAvailableTeamMembers(mergedMembers);
     } catch (err) {
       console.error("Error fetching team members:", err);
+      setAvailableTeamMembers(defaultTeamMembers);
     }
   }, [isAdmin]);
 
@@ -215,61 +265,33 @@ const Index = () => {
     }
   }, [isAdmin, fetchTeamMembers]);
 
-  // Generate color map for team members (admin only)
-  // Uses hash function to ensure same team member always gets same color
   const teamMemberColors = useMemo(() => {
-    if (!isAdmin) return undefined;
-
     const colors = [
       "#1a73e8", // Blue
-      "#ea4335", // Red
       "#34a853", // Green
       "#fbbc04", // Yellow
       "#9c27b0", // Purple
-      "#ff9800", // Orange
+      "#009688", // Teal
       "#00bcd4", // Cyan
-      "#e91e63", // Pink
       "#4caf50", // Light Green
       "#3f51b5", // Indigo
-      "#ff5722", // Deep Orange
-      "#009688", // Teal
-      "#795548", // Brown
-      "#607d8b", // Blue Grey
-      "#cddc39", // Lime
-      "#ffc107", // Amber
+      "#ff9800", // Orange
     ];
 
-    // Simple hash function to get consistent color for same team member
-    const hashString = (str: string): number => {
-      let hash = 0;
-      for (let i = 0; i < str.length; i++) {
-        const char = str.charCodeAt(i);
-        hash = ((hash << 5) - hash) + char;
-        hash = hash & hash; // Convert to 32-bit integer
-      }
-      return Math.abs(hash);
-    };
+    const members = Array.from(
+      new Set(
+        [...events, ...dayViewEvents]
+          .map((e) => e.teamMember)
+          .filter((m): m is string => !!m)
+      )
+    ).sort();
 
-    const colorMap = new Map<string, string>();
-    const uniqueMembers = new Set<string>();
-
-    // Collect all unique team members from events (both month and day view)
-    [...events, ...dayViewEvents].forEach((event) => {
-      if (event.teamMember) {
-        uniqueMembers.add(event.teamMember);
-      }
+    const map = new Map<string, string>();
+    members.forEach((m, i) => {
+      map.set(m, colors[i % colors.length]);
     });
-
-    // Assign colors to team members using hash for consistency
-    // This ensures same team member always gets same color
-    Array.from(uniqueMembers).forEach((member) => {
-      const hash = hashString(member);
-      const colorIndex = hash % colors.length;
-      colorMap.set(member, colors[colorIndex]);
-    });
-
-    return colorMap;
-  }, [events, dayViewEvents, isAdmin]);
+    return map;
+  }, [events, dayViewEvents]);
 
   const handleLogout = () => {
     localStorage.removeItem("team_member");
@@ -297,7 +319,7 @@ const Index = () => {
     // Build query based on role
     let query = supabase
       .from("bookings")
-      .select("id, product_name, summary, booking_time, meet_link, team_member, duration, customer_name, customer_email, phone_number");
+      .select("id, product_name, summary, booking_time, meet_link, team_member, duration, customer_name, customer_email, phone_number, payment_status, typeOfMeeting, isActive");
 
     // If admin and a specific team member is selected, filter by that member
     if (teamMember.toLowerCase() === "admin" && selectedTeamMemberFilter) {
@@ -308,8 +330,10 @@ const Index = () => {
     }
     // If admin and no filter selected, show all events (no filter applied)
 
-    // Order by booking_time
-    query = query.order("booking_time", { ascending: true });
+    // Order by booking_time and include only active (or legacy null) events
+    query = query
+      .order("booking_time", { ascending: true })
+      .or("isActive.eq.true,isActive.is.null");
 
     const { data, error } = await query;
 
@@ -323,8 +347,9 @@ const Index = () => {
     }
 
     const normalized = data ? normalizeEvents(data) : [];
-    setEvents(normalized);
-    return normalized;
+    const activeOnly = normalized.filter((event) => event.isActive ?? true);
+    setEvents(activeOnly);
+    return activeOnly;
   }, [selectedTeamMemberFilter]);
 
   // Load events for a specific date (for day view)
@@ -345,12 +370,16 @@ const Index = () => {
       const day = String(date.getDate()).padStart(2, "0");
       const dateStr = `${year}-${month}-${day}`;
 
+      const utcStart = new Date(`${dateStr}T00:00:00Z`);
+      const rangeStart = new Date(utcStart.getTime() + DISPLAY_TIME_OFFSET_MS);
+      const rangeEnd = new Date(rangeStart.getTime() + DAY_IN_MS);
+
       // Build query - filter by date
       let query = supabase
         .from("bookings")
-        .select("id, product_name, summary, booking_time, meet_link, team_member, duration, customer_name, customer_email, phone_number")
-        .gte("booking_time", `${dateStr}T00:00:00Z`)
-        .lt("booking_time", `${dateStr}T23:59:59Z`);
+        .select("id, product_name, summary, booking_time, meet_link, team_member, duration, customer_name, customer_email, phone_number, payment_status, typeOfMeeting, isActive")
+        .gte("booking_time", rangeStart.toISOString())
+        .lt("booking_time", rangeEnd.toISOString());
 
       // If admin and a specific team member is selected, filter by that member
       if (teamMember.toLowerCase() === "admin" && selectedTeamMemberFilter) {
@@ -361,8 +390,10 @@ const Index = () => {
       }
       // If admin and no filter selected, show all events (no filter applied)
 
-      // Order by booking_time
-      query = query.order("booking_time", { ascending: true });
+      // Order by booking_time and include active (or legacy null) records
+      query = query
+        .order("booking_time", { ascending: true })
+        .or("isActive.eq.true,isActive.is.null");
 
       const { data, error } = await query;
 
@@ -376,8 +407,9 @@ const Index = () => {
       }
 
       const normalized = data ? normalizeEvents(data) : [];
-      setDayViewEvents(normalized);
-      return normalized;
+      const filtered = normalized.filter((event) => (event.isActive ?? true) && event.date === dateStr);
+      setDayViewEvents(filtered);
+      return filtered;
     },
     [selectedTeamMemberFilter]
   );
@@ -426,10 +458,29 @@ const Index = () => {
   };
 
   const handleDateClick = (date: Date) => {
+    if (isMobileViewport) {
+      const targetDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+      const dateKey = formatDate(targetDate);
+      const eventsForDay = events.filter((event) => event.date === dateKey);
+      setMobileSheetDate(targetDate);
+      setMobileSheetEvents(eventsForDay);
+      if (mobileSheetCloseTimeout.current) {
+        window.clearTimeout(mobileSheetCloseTimeout.current);
+        mobileSheetCloseTimeout.current = null;
+      }
+      setIsMobileEventsSheetOpen(true);
+      requestAnimationFrame(() => setIsMobileSheetVisible(true));
+      closeSidebar();
+      return;
+    }
     openAppointmentModal(date);
   };
 
   const handleSidebarDateSelect = (date: Date) => {
+    if (isMobileViewport) {
+      handleDateClick(date);
+      return;
+    }
     const selectedDateObj = new Date(date.getFullYear(), date.getMonth(), date.getDate());
     setCurrentDate(selectedDateObj);
     setDayViewDate(selectedDateObj);
@@ -448,18 +499,6 @@ const Index = () => {
     }
   }, [dayViewDate, viewMode, loadDayViewEvents]);
 
-  const handleCreateAction = (type: "event" | "task" | "appointment") => {
-    if (type === "event" || type === "appointment") {
-      openAppointmentModal(currentDate);
-      return;
-    }
-    if (type === "task") {
-      setIsTaskModalOpen(true);
-      return;
-    }
-    setIsAppointmentModalOpen(true);
-  };
-
   const renderEvents = useCallback(
     (date: Date): CalendarEvent[] => {
       const dateStr = formatDate(date);
@@ -473,10 +512,52 @@ const Index = () => {
     setIsDetailsModalOpen(true);
   };
 
-  const handleAddTask = (title: string, dueDate: string, notes: string) => {
-    setTasks((prev) => [...prev, { id: generateId(), title, dueDate, notes }]);
-    setIsTaskModalOpen(false);
-  };
+  const handleDeleteEvent = useCallback((event: CalendarEvent) => {
+    setEventToDelete(event);
+    setIsDeleteModalOpen(true);
+  }, []);
+
+  const confirmDelete = useCallback(async () => {
+    if (!eventToDelete) return;
+    const fullEventObject = {
+      id: eventToDelete.id,
+      title: eventToDelete.title ?? "",
+      description: eventToDelete.description ?? "",
+      date: eventToDelete.date,
+      meetingLink: eventToDelete.meetingLink ?? null,
+      teamMember: eventToDelete.teamMember ?? null,
+      duration: eventToDelete.duration ?? null,
+      startTime: eventToDelete.startTime ?? null,
+      endTime: eventToDelete.endTime ?? null,
+      bookingTime: eventToDelete.bookingTime ?? eventToDelete.originalBookingTime ?? null,
+      customerName: eventToDelete.customerName ?? null,
+      customerEmail: eventToDelete.customerEmail ?? null,
+      phoneNumber: eventToDelete.phoneNumber ?? null,
+      paymentStatus: eventToDelete.paymentStatus ?? null,
+      isActive: eventToDelete.isActive ?? true,
+    };
+    setDeletingEventId(eventToDelete.id);
+    try {
+      const response = await fetch("https://n8n.srv898271.hstgr.cloud/webhook/delete-client-meeting", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ event: fullEventObject }),
+      });
+      if (!response.ok) {
+        throw new Error(`Delete webhook responded with status ${response.status}`);
+      }
+      toast.success("Event deleted successfully.");
+      setIsDeleteModalOpen(false);
+      setEventToDelete(null);
+    } catch (error) {
+      console.error("Error deleting event:", error);
+      toast.error("Error deleting event. Please try again.");
+    } finally {
+      setDeletingEventId(null);
+    }
+  }, [eventToDelete]);
 
   const handleAddAppointment = useCallback(
     async (values: AppointmentFormValues): Promise<void> => {
@@ -545,6 +626,7 @@ const Index = () => {
             customer_name: values.customerName.trim() || null,
             customer_email: values.customerEmail.trim() || null,
             phone_number: values.phoneNumber.trim() || null,
+             typeOfMeeting: values.typeOfMeeting?.trim() || null,
           })
           .select()
           .single();
@@ -589,21 +671,6 @@ const Index = () => {
 
         toast.success("Appointment scheduled successfully!");
 
-        setAppointments((prev) => [
-          ...prev,
-          {
-            id: generateId(),
-            serviceType: serviceTypeValue,
-            date: values.date,
-            time: values.time,
-            duration: `${durationMinutes}`,
-            meetingLink: values.meetingLink,
-            description: values.description,
-            customerName: values.customerName,
-            customerEmail: values.customerEmail,
-          },
-        ]);
-
         setIsAppointmentModalOpen(false);
         setSelectedDate(null);
       } catch (err) {
@@ -620,8 +687,8 @@ const Index = () => {
   return (
     <div className="min-h-screen bg-[#f6f8fc]">
       <div className="flex h-screen flex-col">
-        <header className="flex items-center justify-between border-b border-[#e0e3eb] bg-white px-4 py-3 shadow-sm md:px-8">
-          <div className="flex items-center gap-4">
+        <header className="border-b border-[#e0e3eb] bg-white px-4 py-3 shadow-sm md:px-8">
+          <div className="flex w-full items-center gap-2 flex-nowrap">
             <button
               type="button"
               className="rounded-full p-2 text-[#5f6368] hover:bg-[#f1f3f4]"
@@ -636,23 +703,13 @@ const Index = () => {
                 <Menu className="h-5 w-5" />
               )}
             </button>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 min-w-0">
               <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-[#d2d6e3] bg-white text-lg font-semibold text-[#1a73e8]">
                 14
               </div>
-              <span className="text-xl font-semibold text-[#5f6368]">Calendar</span>
+              <span className="text-xl font-semibold text-[#5f6368] truncate">Calendar</span>
             </div>
-          </div>
-{/* 
-          <div className="hidden max-w-md flex-1 items-center gap-2 rounded-full border border-[#d2d6e3] bg-[#f1f3f4] px-4 py-2 text-sm text-[#5f6368] md:flex">
-            <Search className="h-4 w-4" />
-            <Input
-              placeholder="Search people and events"
-              className="h-auto border-none bg-transparent p-0 text-sm placeholder:text-[#5f6368] focus-visible:ring-0"
-            />
-          </div> */}
-
-          <div className="flex items-center gap-3">
+            
             {isAdmin && (
               <Select
                 value={selectedTeamMemberFilter || "all"}
@@ -660,8 +717,8 @@ const Index = () => {
                   setSelectedTeamMemberFilter(value === "all" ? null : value);
                 }}
               >
-                <SelectTrigger className="w-[180px] h-9 text-sm">
-                  <SelectValue placeholder="Select team member" />
+                <SelectTrigger className="hidden h-9 w-[150px] text-sm sm:inline-flex">
+                  <SelectValue placeholder="Team member" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Members</SelectItem>
@@ -673,58 +730,46 @@ const Index = () => {
                 </SelectContent>
               </Select>
             )}
-            {teamMember && (
-              <span className="hidden text-sm text-[#5f6368] md:inline-flex">
-                {teamMember}
-              </span>
-            )}
-            {/* <button
-              type="button"
-              className="hidden rounded-full border border-[#d2d6e3] px-4 py-2 text-sm font-medium text-[#5f6368] hover:bg-[#f1f3f4] md:inline-flex"
-            >
-              Support
-            </button> */}
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              onClick={handleLogout}
-              className="rounded-full text-[#5f6368] hover:bg-[#f1f3f4]"
-              title="Logout"
-            >
-              <LogOut className="h-5 w-5" />
-            </Button>
-            <CircleUserRound className="h-9 w-9 text-[#5f6368]" />
+            <div className="flex items-center gap-2 flex-shrink-0 ml-auto">
+              {teamMember && (
+                <span className="text-sm text-[#5f6368] flex-shrink-0">{teamMember}</span>
+              )}
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={handleLogout}
+                className="rounded-full text-[#5f6368] hover:bg-[#f1f3f4]"
+                title="Logout"
+              >
+                <LogOut className="h-5 w-5" />
+              </Button>
+              <CircleUserRound className="h-9 w-9 text-[#5f6368]" />
+            </div>
           </div>
         </header>
 
-        <div className="flex flex-1 overflow-hidden">
-          {!isDesktopViewport && (
-            <div
-              className={`fixed inset-0 z-40 bg-black/40 transition-opacity duration-300 ease-in-out lg:hidden ${
-                isSidebarOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
-              }`}
-              onClick={closeSidebar}
+        <div className="flex flex-1 overflow-hidden w-full">
+          {isDesktopViewport && (
+            <CalendarSidebar
+              currentDate={currentDate}
+              events={events}
+              onSelectDate={handleSidebarDateSelect}
+              onCreateAppointment={() => openAppointmentModal(currentDate)}
+              onEventClick={showEventDetails}
+              onDeleteEvent={handleDeleteEvent}
+              teamMemberColors={teamMemberColors}
+              isAdmin={isAdmin}
+              onViewUpcoming={handleViewUpcomingEvents}
+              isOpen
+              onClose={closeSidebar}
+              isDesktop
+              isCollapsed={isSidebarCollapsed}
+              deletingEventId={deletingEventId}
             />
           )}
-          <CalendarSidebar
-            currentDate={currentDate}
-            events={events}
-            tasks={tasks}
-            appointments={appointments}
-            onSelectDate={handleSidebarDateSelect}
-            onCreate={handleCreateAction}
-            onEventClick={showEventDetails}
-            teamMemberColors={teamMemberColors}
-            isAdmin={isAdmin}
-            onViewUpcoming={handleViewUpcomingEvents}
-            isOpen={isDesktopViewport ? true : isSidebarOpen}
-            onClose={closeSidebar}
-            isDesktop={isDesktopViewport}
-            isCollapsed={isDesktopViewport ? isSidebarCollapsed : false}
-          />
 
-          <main className="flex-1 min-w-0 overflow-hidden flex flex-col">
+          <main className="flex-1 min-w-0 w-full overflow-hidden flex flex-col">
             {viewMode === "month" && (
               <>
                 <div className="px-4 py-6 sm:px-6 lg:px-10">
@@ -741,8 +786,10 @@ const Index = () => {
                     onDateClick={handleDateClick}
                     renderEvents={renderEvents}
                     onEventClick={showEventDetails}
+                    onDeleteEvent={handleDeleteEvent}
                     teamMemberColors={teamMemberColors}
                     isAdmin={isAdmin}
+                    deletingEventId={deletingEventId}
                   />
                 </div>
               </>
@@ -805,8 +852,10 @@ const Index = () => {
                     date={dayViewDate}
                     events={dayViewEvents}
                     onEventClick={showEventDetails}
+                    onDeleteEvent={handleDeleteEvent}
                     teamMemberColors={teamMemberColors}
                     isAdmin={isAdmin}
+                    deletingEventId={deletingEventId}
                   />
                 </div>
               </div>
@@ -822,19 +871,41 @@ const Index = () => {
                 onTeamMemberFilterChange={setSelectedTeamMemberFilter}
                 onBackToCalendar={() => setViewMode("month")}
                 onEventClick={showEventDetails}
-                onCreateEvent={() => handleCreateAction("event")}
+                onCreateAppointment={() => openAppointmentModal(currentDate)}
+                onDeleteEvent={handleDeleteEvent}
+                deletingEventId={deletingEventId}
               />
             )}
           </main>
         </div>
       </div>
 
-      <AddTaskModal
-        isOpen={isTaskModalOpen}
-        selectedDate={currentDate}
-        onClose={() => setIsTaskModalOpen(false)}
-        onAddTask={handleAddTask}
-      />
+      {!isDesktopViewport && (
+        <>
+          <div
+            className={`fixed inset-0 z-40 bg-black/40 transition-opacity duration-300 ease-in-out lg:hidden ${
+              isSidebarOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
+            }`}
+            onClick={closeSidebar}
+          />
+          <CalendarSidebar
+            currentDate={currentDate}
+            events={events}
+            onSelectDate={handleSidebarDateSelect}
+            onCreateAppointment={() => openAppointmentModal(currentDate)}
+            onEventClick={showEventDetails}
+            onDeleteEvent={handleDeleteEvent}
+            teamMemberColors={teamMemberColors}
+            isAdmin={isAdmin}
+            onViewUpcoming={handleViewUpcomingEvents}
+            isOpen={isSidebarOpen}
+            onClose={closeSidebar}
+            isDesktop={false}
+            isCollapsed={false}
+            deletingEventId={deletingEventId}
+          />
+        </>
+      )}
 
       <AppointmentScheduleModal
         isOpen={isAppointmentModalOpen}
@@ -853,11 +924,148 @@ const Index = () => {
       <EventDetailsModal
         isOpen={isDetailsModalOpen}
         event={selectedEvent}
+        onDeleteEvent={handleDeleteEvent}
         onClose={() => {
           setIsDetailsModalOpen(false);
           setSelectedEvent(null);
         }}
       />
+
+      <DeleteEventModal
+        isOpen={isDeleteModalOpen}
+        onClose={() => {
+          if (deletingEventId) return;
+          setIsDeleteModalOpen(false);
+          setEventToDelete(null);
+        }}
+        onConfirm={confirmDelete}
+        eventTitle={eventToDelete?.title}
+      />
+
+      {isMobileEventsSheetOpen && (
+        <div className="fixed inset-0 z-50 md:hidden">
+          <div
+            className={`absolute inset-0 bg-black/40 transition-opacity duration-300 ${
+              isMobileSheetVisible ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
+            }`}
+            onClick={closeMobileSheet}
+          />
+          <div
+            className={`absolute inset-x-0 bottom-0 rounded-t-3xl bg-white shadow-2xl max-h-[85vh] overflow-y-auto p-6 transform transition-transform duration-300 ease-out ${
+              isMobileSheetVisible ? "translate-y-0" : "translate-y-full"
+            }`}
+          >
+            <div className="absolute top-3 left-1/2 h-1.5 w-12 -translate-x-1/2 rounded-full bg-[#d2d6e3]" />
+            <button
+              type="button"
+              aria-label="Close events"
+              className="absolute top-3 right-4 rounded-full p-2 text-[#5f6368] hover:bg-[#f1f3f4]"
+              onClick={closeMobileSheet}
+            >
+              <X className="h-5 w-5" />
+            </button>
+            <div className="pt-8 pb-4 text-center">
+              <p className="text-xs uppercase tracking-[0.3em] text-[#5f6368]">
+                {mobileSheetDate?.toLocaleDateString(undefined, {
+                  weekday: "long",
+                  month: "short",
+                  day: "numeric",
+                })}
+              </p>
+              <h3 className="mt-2 text-2xl font-semibold text-[#202124]">
+                {mobileSheetEvents.length
+                  ? `${mobileSheetEvents.length} event${mobileSheetEvents.length === 1 ? "" : "s"}`
+                  : "No events"}
+              </h3>
+            </div>
+
+            {mobileSheetEvents.length === 0 ? (
+              <p className="text-sm text-center text-[#5f6368]">You’re all caught up for this date.</p>
+            ) : (
+              <div className="space-y-4 pb-4">
+                {mobileSheetEvents.map((event) => {
+                  const startTime = event.startTime
+                    ? new Date(event.startTime).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })
+                    : "N/A";
+                  const endTime = event.endTime
+                    ? new Date(event.endTime).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })
+                    : null;
+                  const accent = getMobileEventAccent(event);
+                  return (
+                    <div
+                      key={event.id}
+                      className={`relative rounded-2xl border border-[#e0e3eb] p-4 shadow-sm ${
+                        deletingEventId === event.id ? "opacity-50 pointer-events-none" : ""
+                      }`}
+                      style={{
+                        borderLeft: `5px solid ${accent}`,
+                        backgroundColor: hexToRgba(accent, 0.08),
+                      }}
+                    >
+                      <button
+                        type="button"
+                        aria-label="Delete event"
+                        className={`absolute top-3 right-3 rounded-full p-1.5 transition ${
+                          deletingEventId === event.id ? "opacity-50 pointer-events-none" : ""
+                        }`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteEvent(event);
+                        }}
+                      >
+                        {deletingEventId === event.id ? (
+                          <svg className="h-4 w-4 animate-spin text-[#9aa0a6]" viewBox="0 0 24 24">
+                            <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" opacity="0.25" />
+                            <path d="M22 12a10 10 0 0 1-10 10" stroke="currentColor" strokeWidth="4" fill="none" opacity="0.75" />
+                          </svg>
+                        ) : (
+                          <Trash2 className="h-4 w-4 text-[#9aa0a6] hover:text-[#d93025]" />
+                        )}
+                      </button>
+                      <p className="text-base font-semibold text-[#202124] mb-1">{event.title || "Untitled Event"}</p>
+                      <p className="text-sm text-[#5f6368] mb-2">
+                        Customer: {(!event.customerName?.trim() || !event.customerEmail?.trim()) ? "No customer details provided" : event.customerName}
+                      </p>
+                      <div className="text-sm text-[#202124] flex flex-wrap gap-x-4 gap-y-1 mb-3">
+                        <span>
+                          Time: {startTime}
+                          {endTime ? ` – ${endTime}` : ""}
+                        </span>
+                        {event.duration && <span>Duration: {event.duration} min</span>}
+                      </div>
+                      {event.meetingLink && (
+                        <a
+                          href={event.meetingLink}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="absolute bottom-4 right-4 text-sm text-[#1a73e8] font-medium hover:underline"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          Join meeting
+                        </a>
+                      )}
+                      {event.teamMember && (
+                        <p className="mt-2 text-xs text-[#5f6368]">Owner: {event.teamMember}</p>
+                      )}
+                      <Button
+                        variant="link"
+                        className="px-0 mt-2 text-sm"
+                        onClick={() => {
+                          closeMobileSheet();
+                          setSelectedEvent(event);
+                          setIsDetailsModalOpen(true);
+                        }}
+                      >
+                        View details
+                      </Button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

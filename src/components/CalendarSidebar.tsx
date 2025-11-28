@@ -1,28 +1,22 @@
 import { useMemo } from "react";
-import { Plus, Clock8, ListChecks, CalendarClock, X } from "lucide-react";
+import { Plus, Clock8, CalendarClock, X, Trash2 } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuTrigger,
-  DropdownMenuContent,
-  DropdownMenuItem,
-} from "@/components/ui/dropdown-menu";
-import type {
-  CalendarEvent,
-  TaskItem,
-  AppointmentSchedule,
-} from "@/pages/Index";
+import type { CalendarEvent } from "@/pages/Index";
 import { cn } from "@/lib/utils";
+import {
+  getCustomerEmailDisplay,
+  getCustomerNameDisplay,
+  getEventDisplayTitle,
+} from "@/lib/eventDisplay";
 
 interface CalendarSidebarProps {
   currentDate: Date;
   events: CalendarEvent[];
-  tasks: TaskItem[];
-  appointments: AppointmentSchedule[];
   onSelectDate: (date: Date) => void;
-  onCreate: (type: "event" | "task" | "appointment") => void;
+  onCreateAppointment: () => void;
   onEventClick: (event: CalendarEvent) => void;
+  onDeleteEvent: (event: CalendarEvent) => void;
   teamMemberColors?: Map<string, string>;
   isAdmin?: boolean;
   onViewUpcoming: () => void;
@@ -30,16 +24,18 @@ interface CalendarSidebarProps {
   onClose: () => void;
   isDesktop?: boolean;
   isCollapsed?: boolean;
+  deletingEventId?: string | null;
 }
+
+const DISPLAY_TIMEZONE = "UTC";
 
 const CalendarSidebar = ({
   currentDate,
   events,
-  tasks,
-  appointments,
   onSelectDate,
-  onCreate,
+  onCreateAppointment,
   onEventClick,
+  onDeleteEvent,
   teamMemberColors,
   isAdmin = false,
   onViewUpcoming,
@@ -47,6 +43,7 @@ const CalendarSidebar = ({
   onClose,
   isDesktop = false,
   isCollapsed = false,
+  deletingEventId,
 }: CalendarSidebarProps) => {
   const startOfToday = useMemo(() => {
     const today = new Date();
@@ -89,6 +86,7 @@ const CalendarSidebar = ({
       date.toLocaleTimeString([], {
         hour: "numeric",
         minute: "2-digit",
+        timeZone: DISPLAY_TIMEZONE,
       });
 
     if (!end) return fmt(start);
@@ -96,7 +94,7 @@ const CalendarSidebar = ({
   };
 
   const getEventAccent = (event: CalendarEvent) => {
-    if (isAdmin && event.teamMember && teamMemberColors) {
+    if (event.teamMember && teamMemberColors) {
       return teamMemberColors.get(event.teamMember) ?? "#1a73e8";
     }
     return "#1a73e8";
@@ -104,14 +102,24 @@ const CalendarSidebar = ({
 
   const showCollapsedShell = isDesktop && isCollapsed;
   const baseClasses = cn(
-    "flex shrink-0 flex-col gap-6 bg-white/95 overflow-y-auto scrollbar-hide transition-all duration-300 ease-in-out border-r border-[#e0e3eb]",
+    "flex shrink-0 flex-col gap-6 bg-white/95 overflow-y-auto scrollbar-hide transition-all duration-300 ease-in-out border-r border-[#e0e3eb] max-h-screen",
     isDesktop
-      ? cn("relative z-auto shadow-none", showCollapsedShell ? "w-16 px-3 py-4" : "w-96 px-6 py-6")
+      ? cn(
+          "relative z-auto shadow-none",
+          showCollapsedShell ? "w-16 px-3 py-4" : "w-full max-w-sm px-4 py-6 sm:px-6"
+        )
       : cn(
-          "fixed inset-y-0 left-0 z-50 w-80 sm:w-96 px-6 py-6 shadow-xl transform",
+          "fixed inset-y-0 left-0 z-50 h-full w-full max-w-sm px-4 py-6 sm:w-96 sm:px-6 shadow-xl transform",
           isOpen ? "translate-x-0" : "-translate-x-full"
         )
   );
+
+  const runActionAndCollapse = (action?: () => void) => {
+    action?.();
+    if (!isDesktop) {
+      onClose();
+    }
+  };
 
   return (
     <aside
@@ -122,15 +130,15 @@ const CalendarSidebar = ({
     >
       {!isDesktop && (
         <div className="flex items-center justify-between lg:hidden">
-        <span className="text-base font-semibold text-[#202124]">Navigation</span>
-        <button
-          type="button"
-          onClick={onClose}
-          className="rounded-full p-2 text-[#5f6368] hover:bg-[#f1f3f4]"
-          aria-label="Close sidebar"
-        >
-          <X className="h-5 w-5" />
-        </button>
+          <span className="text-base font-semibold text-[#202124]">Navigation</span>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-full p-2 text-[#5f6368] hover:bg-[#f1f3f4]"
+            aria-label="Close sidebar"
+          >
+            <X className="h-5 w-5" />
+          </button>
         </div>
       )}
 
@@ -142,69 +150,48 @@ const CalendarSidebar = ({
         </div>
       ) : (
         <>
-          <div className="flex w-full gap-3">
-        
-        {/* VIEW BUTTON (LEFT) */}
-        <Button
-          type="button"
-          variant="outline"
-          onClick={onViewUpcoming}
-          className="
-            w-1/2 h-12 rounded-full border-[#d2d6e3]
-            flex items-center justify-center gap-2
-            text-sm font-medium text-[#1a73e8]
-            hover:bg-[#e8f0fe] hover:text-[#155fc8]
-          "
-        >
-          <CalendarClock className="h-4 w-4" />
-          <span>View</span>
-        </Button>
-
-        {/* CREATE BUTTON (RIGHT) */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
+          <div className="flex w-full flex-col gap-3 sm:flex-row">
             <Button
+              type="button"
+              variant="outline"
+              onClick={() => runActionAndCollapse(onViewUpcoming)}
               className="
-                w-1/2 h-12 rounded-full bg-[#1a73e8] 
+                w-full h-12 rounded-full border-[#d2d6e3]
+                flex items-center justify-center gap-2
+                text-sm font-medium text-[#1a73e8]
+                hover:bg-[#e8f0fe] hover:text-[#155fc8]
+              "
+            >
+              <CalendarClock className="h-4 w-4" />
+              <span>View</span>
+            </Button>
+
+            <Button
+              type="button"
+              onClick={() => runActionAndCollapse(onCreateAppointment)}
+              className="
+                w-full h-12 rounded-full bg-[#1a73e8] 
                 text-sm font-medium flex items-center justify-center gap-2
                 shadow-sm hover:bg-[#155fc8]
               "
             >
               <Plus className="h-4 w-4" />
-              <span>Create</span>
+              <span>Schedule</span>
             </Button>
-          </DropdownMenuTrigger>
-
-          <DropdownMenuContent
-            align="start"
-            className="w-56 rounded-2xl border border-[#d2d6e3] bg-white p-2 text-sm font-medium text-[#3c4043]"
-          >
-            <DropdownMenuItem
-              className="rounded-xl px-3 py-2"
-              onClick={() => onCreate("task")}
-            >
-              Task
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              className="rounded-xl px-3 py-2"
-              onClick={() => onCreate("appointment")}
-            >
-              Appointment schedule
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-
-      </div>
+          </div>
 
       {/* CALENDAR */}
-      <div className="p-4">
+      <div className="px-4 py-4">
         <div className="rounded-2xl border border-[#e0e3eb] bg-white shadow-sm p-4">
-          <div className="[&_*.rdp]:!px-0 [&_*.rdp]:!mx-auto [&_*.rdp-months]:!w-full">
+          <div className="flex justify-center">
             <Calendar
               mode="single"
               selected={currentDate}
-              onSelect={(date) => date && onSelectDate(date)}
-              className="w-full min-w-0 p-0 [&_.rdp-months]:flex [&_.rdp-months]:flex-col"
+              onSelect={(date) => {
+                if (!date) return;
+                runActionAndCollapse(() => onSelectDate(date));
+              }}
+              className="w-full max-w-sm min-w-0 p-0 [&_.rdp-months]:flex [&_.rdp-months]:flex-col [&_.rdp]:mx-auto"
             />
           </div>
         </div>
@@ -231,19 +218,45 @@ const CalendarSidebar = ({
             </p>
           )}
 
-          {upcomingEvents.map((event) => (
-            <div
-              key={event.id}
-              className="
-                group rounded-3xl border border-[#e0e3eb] 
+          {upcomingEvents.map((event) => {
+            const displayTitle = getEventDisplayTitle(event);
+            const customerName = getCustomerNameDisplay(event);
+            const customerEmail = getCustomerEmailDisplay(event);
+            const missingDetails = !event.customerName?.trim() || !event.customerEmail?.trim();
+            return (
+                <div
+                  key={event.id}
+              className={`
+                relative group rounded-3xl border border-[#e0e3eb] 
                 bg-white px-5 py-4 
                 shadow-[0_5px_15px_rgba(15,23,42,0.05)] 
                 transition-all duration-200 cursor-pointer 
-                hover:-translate-y-0.5 hover:shadow-[0_15px_30px_rgba(15,23,42,0.12)]
-              "
+                hover:-translate-y-0.5 hover:shadow-[0_15px_30px_rgba(15,23,42,0.12)] ${
+                  deletingEventId === event.id ? "opacity-50 pointer-events-none" : ""
+                }
+              `}
               style={{ borderLeft: `5px solid ${getEventAccent(event)}` }}
-              onClick={() => onEventClick(event)}
+                  onClick={() => runActionAndCollapse(() => onEventClick(event))}
+              title={`${displayTitle}\nEmail: ${customerEmail}`}
             >
+              <button
+                type="button"
+                aria-label="Delete event"
+                className="absolute top-4 right-4 rounded-full p-1.5"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDeleteEvent(event);
+                }}
+              >
+                {deletingEventId === event.id ? (
+                  <svg className="h-4 w-4 animate-spin text-[#9aa0a6]" viewBox="0 0 24 24">
+                    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" opacity="0.25" />
+                    <path d="M22 12a10 10 0 0 1-10 10" stroke="currentColor" strokeWidth="4" fill="none" opacity="0.75" />
+                  </svg>
+                ) : (
+                  <Trash2 className="h-4 w-4 text-[#9aa0a6] hover:text-[#d93025]" />
+                )}
+              </button>
               <div className="flex items-center gap-2 text-sm font-semibold text-[#202124] tracking-tight">
                 <Clock8 className="h-4 w-4 text-[#1a73e8]" />
                 <span className="text-base font-semibold">
@@ -253,7 +266,7 @@ const CalendarSidebar = ({
 
               <div className="mt-3 flex flex-col gap-2">
                 <p className="text-base font-semibold text-[#202124] leading-snug">
-                  {event.title}
+                  {displayTitle}
                 </p>
 
                 {formatEventTime(event) && (
@@ -262,108 +275,20 @@ const CalendarSidebar = ({
                   </span>
                 )}
 
+                <div className="text-sm text-[#5f6368] leading-relaxed">
+                  <p>{missingDetails ? "No customer details provided" : `Customer Name: ${customerName}`}</p>
+                  <p className="text-xs">{missingDetails ? "No customer details provided" : `Email: ${customerEmail}`}</p>
+                </div>
+
                 {event.description && (
                   <p className="text-sm text-[#5f6368] leading-relaxed line-clamp-2">
                     {event.description}
                   </p>
                 )}
               </div>
+              
             </div>
-          ))}
-        </div>
-      </div>
-
-      {/* TASKS */}
-      <div>
-        <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-[#5f6368]">
-          Tasks
-        </h3>
-
-        <div className="space-y-2">
-          {tasks.length === 0 && (
-            <p className="text-sm text-[#5f6368]">No tasks yet.</p>
-          )}
-
-          {tasks.map((task) => (
-            <div
-              key={task.id}
-              className="rounded-2xl border border-[#e0e3eb] bg-white px-3 py-2 text-sm shadow-sm"
-            >
-              <div className="flex items-center gap-2 text-[#1a73e8]">
-                <ListChecks className="h-4 w-4" />
-                <span className="font-semibold">
-                  {new Date(task.dueDate).toLocaleDateString(undefined, {
-                    month: "short",
-                    day: "numeric",
-                  })}
-                </span>
-              </div>
-              <p className="mt-1 font-medium text-[#202124]">{task.title}</p>
-              {task.notes && (
-                <p className="text-xs text-[#5f6368] line-clamp-2">
-                  {task.notes}
-                </p>
-              )}
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* APPOINTMENTS */}
-      <div>
-        <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-[#5f6368]">
-          Appointment schedules
-        </h3>
-
-        <div className="space-y-2">
-          {appointments.length === 0 && (
-            <p className="text-sm text-[#5f6368]">
-              No appointment blocks created.
-            </p>
-          )}
-
-          {appointments.map((appointment) => (
-            <div
-              key={appointment.id}
-              className="rounded-2xl border border-[#e0e3eb] bg-white px-3 py-2 text-sm shadow-sm"
-            >
-              <div className="flex items-center gap-2 text-[#1a73e8]">
-                <CalendarClock className="h-4 w-4" />
-                <span className="font-semibold">
-                  {new Date(appointment.date).toLocaleDateString(undefined, {
-                    weekday: "short",
-                    month: "short",
-                    day: "numeric",
-                  })}
-                </span>
-              </div>
-
-              <p className="mt-1 font-medium text-[#202124]">
-                {appointment.serviceType}
-              </p>
-              <p className="text-xs text-[#5f6368]">
-                {appointment.time} • {appointment.duration} mins
-              </p>
-
-              {appointment.customerName && (
-                <p className="text-xs text-[#5f6368]">
-                  Client: {appointment.customerName}
-                </p>
-              )}
-
-              {appointment.meetingLink && (
-                <p className="text-xs text-[#5f6368] line-clamp-1">
-                  {appointment.meetingLink}
-                </p>
-              )}
-
-              {appointment.description && (
-                <p className="text-xs text-[#5f6368] line-clamp-2">
-                  {appointment.description}
-                </p>
-              )}
-            </div>
-          ))}
+          );})}
         </div>
       </div>
 

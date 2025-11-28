@@ -1,14 +1,23 @@
 import { Button } from "@/components/ui/button";
-import { X, Video, Clock, User } from "lucide-react";
+import { X, Video, Clock, User, Trash2 } from "lucide-react";
 import { CalendarEvent } from "@/pages/Index";
+import {
+  getCustomerEmailDisplay,
+  getCustomerNameDisplay,
+  getCustomerPhoneDisplay,
+  getEventDisplayTitle,
+} from "@/lib/eventDisplay";
 
 interface EventDetailsModalProps {
   isOpen: boolean;
   event: CalendarEvent | null;
   onClose: () => void;
+  onDeleteEvent: (event: CalendarEvent) => void;
 }
 
-const EventDetailsModal = ({ isOpen, event, onClose }: EventDetailsModalProps) => {
+const DISPLAY_TIMEZONE = "UTC";
+
+const EventDetailsModal = ({ isOpen, event, onClose, onDeleteEvent }: EventDetailsModalProps) => {
   const formatDateDisplay = (dateStr: string): string => {
     const date = new Date(dateStr + "T00:00:00");
     const options: Intl.DateTimeFormatOptions = {
@@ -28,7 +37,18 @@ const EventDetailsModal = ({ isOpen, event, onClose }: EventDetailsModalProps) =
       hour: "numeric",
       minute: "2-digit",
       hour12: true,
+      timeZone: DISPLAY_TIMEZONE,
     });
+  };
+
+  const getPaymentStatusClasses = (status?: string | null) => {
+    if (!status) return "hidden";
+    const s = status.toLowerCase();
+    if (s === "paid") return "inline-flex items-center rounded-full px-2 py-1 text-xs font-medium bg-green-100 text-green-800";
+    if (s === "pending") return "inline-flex items-center rounded-full px-2 py-1 text-xs font-medium bg-yellow-100 text-yellow-800";
+    if (s === "unpaid" || s === "failed") return "inline-flex items-center rounded-full px-2 py-1 text-xs font-medium bg-red-100 text-red-800";
+    if (s === "refunded") return "inline-flex items-center rounded-full px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800";
+    return "inline-flex items-center rounded-full px-2 py-1 text-xs font-medium bg-gray-100 text-gray-800";
   };
 
   if (!isOpen || !event) return null;
@@ -37,6 +57,10 @@ const EventDetailsModal = ({ isOpen, event, onClose }: EventDetailsModalProps) =
   const startTime = event.startTime ? formatTime12Hour(event.startTime) : null;
   const endTime = event.endTime ? formatTime12Hour(event.endTime) : null;
   const duration = event.duration ?? null;
+  const displayTitle = getEventDisplayTitle(event);
+  const customerNameDisplay = getCustomerNameDisplay(event);
+  const customerEmailDisplay = getCustomerEmailDisplay(event);
+  const customerPhoneDisplay = getCustomerPhoneDisplay(event);
 
   return (
     <div
@@ -45,26 +69,49 @@ const EventDetailsModal = ({ isOpen, event, onClose }: EventDetailsModalProps) =
       onClick={onClose}
     >
       <div
-        className="bg-card rounded-lg shadow-[var(--shadow-lg)] max-w-md w-full p-6 animate-in fade-in zoom-in duration-200"
+        className="relative bg-card rounded-lg shadow-[var(--shadow-lg)] max-w-md w-full p-6 animate-in fade-in zoom-in duration-200"
         onClick={(e) => e.stopPropagation()}
       >
+        <button
+          className="absolute top-4 right-4 z-10 rounded-full p-2 text-muted-foreground transition-colors hover:bg-muted/40 hover:text-foreground"
+          aria-label="Close modal"
+          onClick={onClose}
+        >
+          <X className="h-5 w-5" />
+        </button>
         {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex-1">
-            <h2 id="detailTitle" className="text-2xl font-semibold text-foreground mb-1">
-              {event.title}
-            </h2>
-            <p id="detailDate" className="text-sm text-muted-foreground">
-              {formatDateDisplay(event.date)}
-            </p>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between mb-6 pr-8">
+          <div className="flex-1 space-y-2">
+            <div>
+              <h2 id="detailTitle" className="text-2xl font-semibold text-foreground mb-1 break-words">
+                {displayTitle}
+              </h2>
+              <div className="flex flex-wrap items-center gap-3">
+                <p id="detailDate" className="text-sm text-muted-foreground">
+                  {formatDateDisplay(event.date)}
+                </p>
+                {event.paymentStatus && (
+                  <span className={getPaymentStatusClasses(event.paymentStatus)}>
+                    {`${event.paymentStatus.charAt(0).toUpperCase()}${event.paymentStatus.slice(1)}`}
+                  </span>
+                )}
+              </div>
+            </div>
+            <div className="space-y-1 text-sm text-foreground">
+              <p>
+                <span className="font-medium">Customer Name: </span>
+                <span className="text-muted-foreground">{customerNameDisplay}</span>
+              </p>
+              <p>
+                <span className="font-medium">Email: </span>
+                <span className="text-muted-foreground">{customerEmailDisplay}</span>
+              </p>
+              <p>
+                <span className="font-medium">Phone: </span>
+                <span className="text-muted-foreground">{customerPhoneDisplay}</span>
+              </p>
+            </div>
           </div>
-          <button
-            className="text-muted-foreground hover:text-foreground transition-colors"
-            aria-label="Close modal"
-            onClick={onClose}
-          >
-            <X className="h-5 w-5" />
-          </button>
         </div>
 
         {/* Time Information */}
@@ -105,6 +152,14 @@ const EventDetailsModal = ({ isOpen, event, onClose }: EventDetailsModalProps) =
           </div>
         )}
 
+        {/* Type of Meeting */}
+        {event.typeOfMeeting && (
+          <div className="mb-6">
+            <h3 className="text-sm font-medium text-foreground mb-2">Type of Meeting</h3>
+            <p className="text-sm text-muted-foreground">{event.typeOfMeeting}</p>
+          </div>
+        )}
+
         {/* Description */}
         <div className="mb-6">
           <h3 className="text-sm font-medium text-foreground mb-2">Description</h3>
@@ -132,7 +187,15 @@ const EventDetailsModal = ({ isOpen, event, onClose }: EventDetailsModalProps) =
         )}
 
         {/* Close Button */}
-        <div className="flex justify-end">
+        <div className="flex justify-end gap-2">
+          <Button
+            variant="destructive"
+            className="flex items-center gap-2"
+            onClick={() => event && onDeleteEvent(event)}
+          >
+            <Trash2 className="h-4 w-4" />
+            Delete
+          </Button>
           <Button variant="outline" className="hover:bg-secondary" onClick={onClose}>
             Close
           </Button>

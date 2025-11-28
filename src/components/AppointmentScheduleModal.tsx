@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -10,6 +10,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { X } from "lucide-react";
+
+const defaultTeamMembers = ["Gauri", "Test", "Admin"];
 
 interface AppointmentScheduleModalProps {
   isOpen: boolean;
@@ -25,6 +27,7 @@ interface AppointmentScheduleModalProps {
     duration: string;
     meetingLink: string;
     description: string;
+    typeOfMeeting?: string;
     teamMember?: string;
   }) => Promise<void>;
   isSaving: boolean;
@@ -52,7 +55,12 @@ const AppointmentScheduleModal = ({
   const [duration, setDuration] = useState("60");
   const [meetingLink, setMeetingLink] = useState("");
   const [description, setDescription] = useState("");
+  const [typeOfMeeting, setTypeOfMeeting] = useState("");
   const [selectedTeamMember, setSelectedTeamMember] = useState("");
+  const mergedTeamMembers = useMemo(
+    () => Array.from(new Set([...defaultTeamMembers, ...teamMembers])),
+    [teamMembers]
+  );
 
   useEffect(() => {
     if (isOpen && selectedDate) {
@@ -71,15 +79,16 @@ const AppointmentScheduleModal = ({
       setDuration("60");
       setMeetingLink("");
       setDescription("");
+      setTypeOfMeeting("");
       setSelectedTeamMember("");
       return;
     }
 
     if (isAdmin) {
-      const fallbackMember = initialTeamMember ?? teamMembers[0] ?? "";
+      const fallbackMember = initialTeamMember ?? mergedTeamMembers[0] ?? "";
       setSelectedTeamMember(fallbackMember);
     }
-  }, [isOpen, isAdmin, initialTeamMember, teamMembers]);
+  }, [isOpen, isAdmin, initialTeamMember, mergedTeamMembers]);
 
   const handleSubmit = async () => {
     if (!serviceType.trim() || !date || !time) return;
@@ -96,6 +105,7 @@ const AppointmentScheduleModal = ({
         duration,
         meetingLink,
         description,
+        typeOfMeeting,
         teamMember: isAdmin ? selectedTeamMember : undefined,
       });
     } catch (error) {
@@ -208,6 +218,22 @@ const AppointmentScheduleModal = ({
               />
             </div>
 
+              <div>
+                <label className="mb-1 block text-sm font-medium text-[#5f6368]">Type of Meeting</label>
+                <Select
+                  value={typeOfMeeting || undefined}
+                  onValueChange={(value) => setTypeOfMeeting(value)}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select meeting type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="On Call">On Call</SelectItem>
+                    <SelectItem value="In Person">In Person</SelectItem>
+                    <SelectItem value="On Google Meet / Zoom Call">On Google Meet / Zoom Call</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             {isAdmin && (
               <div>
                 <label className="mb-1 block text-sm font-medium text-[#5f6368]">
@@ -216,13 +242,13 @@ const AppointmentScheduleModal = ({
                 <Select
                   value={selectedTeamMember || undefined}
                   onValueChange={(value) => setSelectedTeamMember(value)}
-                  disabled={teamMembers.length === 0}
+                  disabled={mergedTeamMembers.length === 0}
                 >
                   <SelectTrigger className="w-full">
                     <SelectValue placeholder="Choose team member" />
                   </SelectTrigger>
                   <SelectContent>
-                    {teamMembers.map((member) => (
+                    {mergedTeamMembers.map((member) => (
                       <SelectItem key={member} value={member}>
                         {member}
                       </SelectItem>
