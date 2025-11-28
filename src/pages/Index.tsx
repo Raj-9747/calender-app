@@ -31,6 +31,7 @@ export interface CalendarEvent {
   customerEmail?: string | null;
   phoneNumber?: string | null;
   paymentStatus?: string | null;
+  typeOfMeeting?: string | null;
   isActive?: boolean;
 }
 
@@ -44,6 +45,7 @@ type AppointmentFormValues = {
   duration: string;
   meetingLink: string;
   description: string;
+    typeOfMeeting?: string;
   teamMember?: string;
 };
 
@@ -59,6 +61,7 @@ type SupabaseBookingRow = {
   customer_email: string | null;
   phone_number: string | null;
   payment_status: string | null;
+  typeOfMeeting: string | null;
   isActive: boolean | null;
 };
 
@@ -108,6 +111,7 @@ const normalizeEvents = (rows: SupabaseBookingRow[]): CalendarEvent[] =>
       customerEmail: row.customer_email,
       phoneNumber: row.phone_number,
       paymentStatus: row.payment_status ?? null,
+      typeOfMeeting: row.typeOfMeeting ?? null,
       isActive: row.isActive ?? true,
     };
   });
@@ -315,7 +319,7 @@ const Index = () => {
     // Build query based on role
     let query = supabase
       .from("bookings")
-      .select("id, product_name, summary, booking_time, meet_link, team_member, duration, customer_name, customer_email, phone_number, payment_status, isActive");
+      .select("id, product_name, summary, booking_time, meet_link, team_member, duration, customer_name, customer_email, phone_number, payment_status, typeOfMeeting, isActive");
 
     // If admin and a specific team member is selected, filter by that member
     if (teamMember.toLowerCase() === "admin" && selectedTeamMemberFilter) {
@@ -373,7 +377,7 @@ const Index = () => {
       // Build query - filter by date
       let query = supabase
         .from("bookings")
-        .select("id, product_name, summary, booking_time, meet_link, team_member, duration, customer_name, customer_email, phone_number, payment_status, isActive")
+        .select("id, product_name, summary, booking_time, meet_link, team_member, duration, customer_name, customer_email, phone_number, payment_status, typeOfMeeting, isActive")
         .gte("booking_time", rangeStart.toISOString())
         .lt("booking_time", rangeEnd.toISOString());
 
@@ -622,6 +626,7 @@ const Index = () => {
             customer_name: values.customerName.trim() || null,
             customer_email: values.customerEmail.trim() || null,
             phone_number: values.phoneNumber.trim() || null,
+             typeOfMeeting: values.typeOfMeeting?.trim() || null,
           })
           .select()
           .single();
