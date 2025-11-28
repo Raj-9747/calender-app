@@ -106,10 +106,9 @@ const getSectionKey = (date: Date, today: Date): SectionKey => {
 
 const getAccentColor = (
   event: CalendarEvent,
-  isAdmin: boolean,
   teamMemberColors?: Map<string, string>,
 ) => {
-  if (isAdmin && event.teamMember && teamMemberColors) {
+  if (event.teamMember && teamMemberColors) {
     return teamMemberColors.get(event.teamMember) ?? "#1a73e8";
   }
   return "#1a73e8";
@@ -259,7 +258,7 @@ const UpcomingEventsView = ({
 
                   <div className="space-y-4">
                     {section.events.map((event) => {
-                      const accent = getAccentColor(event, isAdmin, teamMemberColors);
+                      const accent = getAccentColor(event, teamMemberColors);
                       const duration = event.duration ?? 60;
                       const timeRange = formatTimeRange(event);
                       const dateLabel = formatDateWithWeekday(new Date(event.date));

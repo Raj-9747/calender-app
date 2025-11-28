@@ -113,7 +113,7 @@ const normalizeEvents = (rows: SupabaseBookingRow[]): CalendarEvent[] =>
   });
 
 type ViewMode = "month" | "day" | "upcoming";
-const defaultTeamMembers = ["Gauri", "Monica", "Shafoli"];
+const defaultTeamMembers = ["Gauri", "Monica", "Shafoli","Farahnaz","Merilo"];
 
 const Index = () => {
   const navigate = useNavigate();
@@ -261,61 +261,33 @@ const Index = () => {
     }
   }, [isAdmin, fetchTeamMembers]);
 
-  // Generate color map for team members (admin only)
-  // Uses hash function to ensure same team member always gets same color
   const teamMemberColors = useMemo(() => {
-    if (!isAdmin) return undefined;
-
     const colors = [
       "#1a73e8", // Blue
-      "#ea4335", // Red
       "#34a853", // Green
       "#fbbc04", // Yellow
       "#9c27b0", // Purple
-      "#ff9800", // Orange
+      "#009688", // Teal
       "#00bcd4", // Cyan
-      "#e91e63", // Pink
       "#4caf50", // Light Green
       "#3f51b5", // Indigo
-      "#ff5722", // Deep Orange
-      "#009688", // Teal
-      "#795548", // Brown
-      "#607d8b", // Blue Grey
-      "#cddc39", // Lime
-      "#ffc107", // Amber
+      "#ff9800", // Orange
     ];
 
-    // Simple hash function to get consistent color for same team member
-    const hashString = (str: string): number => {
-      let hash = 0;
-      for (let i = 0; i < str.length; i++) {
-        const char = str.charCodeAt(i);
-        hash = ((hash << 5) - hash) + char;
-        hash = hash & hash; // Convert to 32-bit integer
-      }
-      return Math.abs(hash);
-    };
+    const members = Array.from(
+      new Set(
+        [...events, ...dayViewEvents]
+          .map((e) => e.teamMember)
+          .filter((m): m is string => !!m)
+      )
+    ).sort();
 
-    const colorMap = new Map<string, string>();
-    const uniqueMembers = new Set<string>();
-
-    // Collect all unique team members from events (both month and day view)
-    [...events, ...dayViewEvents].forEach((event) => {
-      if (event.teamMember) {
-        uniqueMembers.add(event.teamMember);
-      }
+    const map = new Map<string, string>();
+    members.forEach((m, i) => {
+      map.set(m, colors[i % colors.length]);
     });
-
-    // Assign colors to team members using hash for consistency
-    // This ensures same team member always gets same color
-    Array.from(uniqueMembers).forEach((member) => {
-      const hash = hashString(member);
-      const colorIndex = hash % colors.length;
-      colorMap.set(member, colors[colorIndex]);
-    });
-
-    return colorMap;
-  }, [events, dayViewEvents, isAdmin]);
+    return map;
+  }, [events, dayViewEvents]);
 
   const handleLogout = () => {
     localStorage.removeItem("team_member");

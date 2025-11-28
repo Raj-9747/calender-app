@@ -35,9 +35,8 @@ const format12 = (date: Date): string =>
 const getEventColor = (
   event: CalendarEvent,
   colors?: Map<string, string>,
-  isAdmin?: boolean
 ): string => {
-  if (isAdmin && event.teamMember && colors) {
+  if (event.teamMember && colors) {
     return colors.get(event.teamMember) || "#1a73e8";
   }
   return "#1a73e8";
@@ -168,8 +167,7 @@ export default function DayView({
                     ({ ev, start, end, top, height }) => {
                       const color = getEventColor(
                         ev,
-                        teamMemberColors,
-                        isAdmin
+                        teamMemberColors
                       );
                       const bg = hexToRgba(color, 0.1);
                       const border = hexToRgba(color, 0.3);

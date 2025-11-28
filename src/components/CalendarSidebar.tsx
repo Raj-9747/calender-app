@@ -94,7 +94,7 @@ const CalendarSidebar = ({
   };
 
   const getEventAccent = (event: CalendarEvent) => {
-    if (isAdmin && event.teamMember && teamMemberColors) {
+    if (event.teamMember && teamMemberColors) {
       return teamMemberColors.get(event.teamMember) ?? "#1a73e8";
     }
     return "#1a73e8";

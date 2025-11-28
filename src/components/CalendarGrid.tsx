@@ -25,7 +25,7 @@ const CalendarGrid = ({
 }: CalendarGridProps) => {
   // Get color for event based on team member
   const getEventColor = (event: CalendarEvent): { bg: string; border: string; text: string } => {
-    if (isAdmin && event.teamMember && teamMemberColors) {
+    if (event.teamMember && teamMemberColors) {
       const color = teamMemberColors.get(event.teamMember) || "#1a73e8";
       // Convert hex to rgba for background with opacity
       const r = parseInt(color.slice(1, 3), 16);
@@ -37,7 +37,7 @@ const CalendarGrid = ({
         text: color,
       };
     }
-    // Default blue color for non-admin or events without team member
+    // Default blue color for events without team member
     return {
       bg: "#e8f0fe",
       border: "#cfe0fc",

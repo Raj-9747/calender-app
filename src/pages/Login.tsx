@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
 
-const defaultTeamMembers = ["Gauri", "Monica", "Shafoli"];
+const defaultTeamMembers = ["Gauri", "Monica", "Shafoli","Farahnaz","Merilo"];
 const TEAM_PASSWORD = "12345";
 
 const Login = () => {
