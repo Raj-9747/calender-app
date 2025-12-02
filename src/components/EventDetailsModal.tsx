@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { X, Video, Clock, User, Trash2 } from "lucide-react";
+import { X, Video, Clock, User, Trash2, Calendar } from "lucide-react";
 import { CalendarEvent } from "@/pages/Index";
 import {
   getCustomerEmailDisplay,
@@ -18,6 +18,8 @@ interface EventDetailsModalProps {
 const DISPLAY_TIMEZONE = "UTC";
 
 const EventDetailsModal = ({ isOpen, event, onClose, onDeleteEvent }: EventDetailsModalProps) => {
+  if (!isOpen || !event) return null;
+
   const formatDateDisplay = (dateStr: string): string => {
     const date = new Date(dateStr + "T00:00:00");
     const options: Intl.DateTimeFormatOptions = {
@@ -51,16 +53,133 @@ const EventDetailsModal = ({ isOpen, event, onClose, onDeleteEvent }: EventDetai
     return "inline-flex items-center rounded-full px-2 py-1 text-xs font-medium bg-gray-100 text-gray-800";
   };
 
-  if (!isOpen || !event) return null;
-
   // Format times in 12-hour format for display
   const startTime = event.startTime ? formatTime12Hour(event.startTime) : null;
   const endTime = event.endTime ? formatTime12Hour(event.endTime) : null;
   const duration = event.duration ?? null;
+
   const displayTitle = getEventDisplayTitle(event);
   const customerNameDisplay = getCustomerNameDisplay(event);
   const customerEmailDisplay = getCustomerEmailDisplay(event);
   const customerPhoneDisplay = getCustomerPhoneDisplay(event);
+
+  // Render recurring task layout
+  if (event.source === "recurring_task") {
+    return (
+      <div
+        id="eventDetails"
+        className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+        onClick={onClose}
+      >
+        <div
+          className="relative bg-card rounded-lg shadow-[var(--shadow-lg)] max-w-md w-full p-6 animate-in fade-in zoom-in duration-200"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button
+            className="absolute top-4 right-4 z-10 rounded-full p-2 text-muted-foreground transition-colors hover:bg-muted/40 hover:text-foreground"
+            aria-label="Close modal"
+            onClick={onClose}
+          >
+            <X className="h-5 w-5" />
+          </button>
+
+          {/* Header */}
+          <div className="flex flex-col gap-4 mb-6 pr-8">
+            <div>
+              <h2 id="detailTitle" className="text-2xl font-semibold text-foreground mb-3 break-words">
+                {event.title}
+              </h2>
+            </div>
+          </div>
+
+          {/* Time Information */}
+          {(startTime || endTime || duration) && (
+            <div className="mb-6 space-y-3 bg-muted/30 rounded-lg p-4">
+              {startTime && (
+                <div className="flex items-center gap-3 text-sm">
+                  <Clock className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                  <div className="flex flex-col">
+                    <span className="text-muted-foreground text-xs uppercase tracking-wide">Start</span>
+                    <span className="text-foreground font-medium">{startTime}</span>
+                  </div>
+                </div>
+              )}
+              {endTime && (
+                <div className="flex items-center gap-3 text-sm">
+                  <Clock className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                  <div className="flex flex-col">
+                    <span className="text-muted-foreground text-xs uppercase tracking-wide">End</span>
+                    <span className="text-foreground font-medium">{endTime}</span>
+                  </div>
+                </div>
+              )}
+              {duration && (
+                <div className="flex items-center gap-3 text-sm">
+                  <Clock className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                  <div className="flex flex-col">
+                    <span className="text-muted-foreground text-xs uppercase tracking-wide">Duration</span>
+                    <span className="text-foreground font-medium">{duration} minutes</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Team Member */}
+          {event.teamMember && (
+            <div className="mb-6">
+              <div className="flex items-center gap-2 text-sm mb-2">
+                <User className="h-4 w-4 text-muted-foreground" />
+                <h3 className="text-sm font-medium text-foreground">Team Member</h3>
+              </div>
+              <p className="text-sm text-muted-foreground ml-6">{event.teamMember}</p>
+            </div>
+          )}
+
+          {/* Weekdays */}
+          {event.recurringDays && event.recurringDays.length > 0 && (
+            <div className="mb-6">
+              <div className="flex items-center gap-2 text-sm mb-2">
+                <Calendar className="h-4 w-4 text-muted-foreground" />
+                <h3 className="text-sm font-medium text-foreground">Recurring On</h3>
+              </div>
+              <div className="ml-6 flex flex-wrap gap-2">
+                {event.recurringDays.map((day) => (
+                  <span
+                    key={day}
+                    className="inline-flex items-center rounded-full px-3 py-1 text-xs font-medium bg-primary/10 text-primary border border-primary/20"
+                  >
+                    {day}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Close and Delete Buttons */}
+          <div className="flex justify-end gap-2">
+            <Button
+              variant="destructive"
+              className="flex items-center gap-2"
+              onClick={() => event && onDeleteEvent(event)}
+            >
+              <Trash2 className="h-4 w-4" />
+              Delete
+            </Button>
+            <Button variant="outline" className="hover:bg-secondary" onClick={onClose}>
+              Close
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Render regular booking layout
+  const displayTitleBooking = getEventDisplayTitle(event);
+  const customerNameDisplayBooking = getCustomerNameDisplay(event);
+  const customerEmailDisplayBooking = getCustomerEmailDisplay(event);
+  const customerPhoneDisplayBooking = getCustomerPhoneDisplay(event);
 
   return (
     <div
@@ -84,7 +203,7 @@ const EventDetailsModal = ({ isOpen, event, onClose, onDeleteEvent }: EventDetai
           <div className="flex-1 space-y-2">
             <div>
               <h2 id="detailTitle" className="text-2xl font-semibold text-foreground mb-1 break-words">
-                {displayTitle}
+                {displayTitleBooking}
               </h2>
               <div className="flex flex-wrap items-center gap-3">
                 <p id="detailDate" className="text-sm text-muted-foreground">
@@ -100,15 +219,15 @@ const EventDetailsModal = ({ isOpen, event, onClose, onDeleteEvent }: EventDetai
             <div className="space-y-1 text-sm text-foreground">
               <p>
                 <span className="font-medium">Customer Name: </span>
-                <span className="text-muted-foreground">{customerNameDisplay}</span>
+                <span className="text-muted-foreground">{customerNameDisplayBooking}</span>
               </p>
               <p>
                 <span className="font-medium">Email: </span>
-                <span className="text-muted-foreground">{customerEmailDisplay}</span>
+                <span className="text-muted-foreground">{customerEmailDisplayBooking}</span>
               </p>
               <p>
                 <span className="font-medium">Phone: </span>
-                <span className="text-muted-foreground">{customerPhoneDisplay}</span>
+                <span className="text-muted-foreground">{customerPhoneDisplayBooking}</span>
               </p>
             </div>
           </div>

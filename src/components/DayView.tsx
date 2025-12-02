@@ -36,6 +36,23 @@ const getEventColor = (
   event: CalendarEvent,
   colors?: Map<string, string>,
 ): string => {
+  // Use different colors for recurring tasks
+  if (event.source === "recurring_task") {
+    const recurringTaskColors = [
+      "#ea4335", // Red
+      "#fbbc04", // Yellow
+      "#34a853", // Green
+      "#00897b", // Teal
+      "#1565c0", // Dark Blue
+      "#6f42c1", // Purple
+    ];
+    
+    if (event.teamMember) {
+      const colorIndex = event.teamMember.charCodeAt(0) % recurringTaskColors.length;
+      return recurringTaskColors[colorIndex];
+    }
+  }
+  
   if (event.teamMember && colors) {
     return colors.get(event.teamMember) || "#1a73e8";
   }
@@ -171,6 +188,7 @@ export default function DayView({
                       );
                       const bg = hexToRgba(color, 0.1);
                       const border = hexToRgba(color, 0.3);
+                      const isRecurringTask = ev.source === "recurring_task";
 
                       const emailLabel = getCustomerEmailDisplay(ev);
                       const displayTitle = getEventDisplayTitle(ev);
@@ -179,21 +197,23 @@ export default function DayView({
                           key={ev.id}
                           className={`absolute left-2 right-2 rounded-md shadow-sm border-l-4 cursor-pointer hover:shadow-md ${
                             deletingEventId === ev.id ? "opacity-50 pointer-events-none" : ""
-                          }`}
+                          } ${isRecurringTask ? "border-l-8" : ""}`}
                           style={{
                             top,
                             height,
-                            backgroundColor: bg,
-                            borderColor: border,
+                            backgroundColor: hexToRgba(color, isRecurringTask ? 0.15 : 0.1),
+                            borderColor: hexToRgba(color, isRecurringTask ? 0.4 : 0.3),
                             borderLeftColor: color,
+                            borderLeftWidth: isRecurringTask ? "8px" : "4px",
                           }}
                           onClick={() => onEventClick(ev)}
-                          title={`${displayTitle}\nEmail: ${emailLabel}`}
+                          title={`${displayTitle}${isRecurringTask ? " (Recurring Task)" : ""}\nEmail: ${emailLabel}`}
                         >
                           <div className="p-2 flex flex-col h-full gap-1">
                             <div className="flex items-start justify-between gap-2">
-                              <div className="text-xs font-semibold line-clamp-2 flex-1">
-                                {displayTitle}
+                              <div className="text-xs font-semibold line-clamp-2 flex-1 flex items-start gap-1">
+                                {isRecurringTask && <span className="font-bold text-base leading-none">📌</span>}
+                                <span>{displayTitle}</span>
                               </div>
                               <button
                                 type="button"
@@ -220,7 +240,11 @@ export default function DayView({
                             </div>
 
                             <div className="text-[11px] text-[#5f6368]">
-                              {(!ev.customerName?.trim() || !ev.customerEmail?.trim()) ? CUSTOMER_NAME_FALLBACK : `Email: ${emailLabel}`}
+                              {isRecurringTask ? (
+                                <span className="font-medium">Recurring Task</span>
+                              ) : (
+                                (!ev.customerName?.trim() || !ev.customerEmail?.trim()) ? CUSTOMER_NAME_FALLBACK : `Email: ${emailLabel}`
+                              )}
                             </div>
 
                             {ev.teamMember && (

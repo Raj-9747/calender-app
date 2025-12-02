@@ -33,6 +33,20 @@ export interface CalendarEvent {
   paymentStatus?: string | null;
   typeOfMeeting?: string | null;
   isActive?: boolean;
+  source?: "booking" | "recurring_task"; // Distinguish between bookings and recurring tasks
+  recurringDays?: string[]; // Days of week for recurring tasks
+}
+
+export interface RecurringTask {
+  id: number;
+  team_member: string;
+  event_title: string;
+  event_date: string; // YYYY-MM-DD format
+  start_time: string; // HH:MM:SS format
+  end_time: string; // HH:MM:SS format
+  batch_id?: string | null;
+  selected_days?: string | null; // Comma-separated days (e.g., "Monday,Tuesday,Wednesday")
+  created_at?: string;
 }
 
 type AppointmentFormValues = {
@@ -113,6 +127,47 @@ const normalizeEvents = (rows: SupabaseBookingRow[]): CalendarEvent[] =>
       paymentStatus: row.payment_status ?? null,
       typeOfMeeting: row.typeOfMeeting ?? null,
       isActive: row.isActive ?? true,
+      source: "booking",
+    };
+  });
+
+const normalizeRecurringTasks = (rows: RecurringTask[]): CalendarEvent[] =>
+  rows.map((row) => {
+    // Parse start and end times
+    const dateStr = row.event_date; // Already in YYYY-MM-DD format
+    const startTimeISO = new Date(`${dateStr}T${row.start_time}Z`).toISOString();
+    const endTimeISO = new Date(`${dateStr}T${row.end_time}Z`).toISOString();
+    
+    // Calculate duration in minutes
+    const startDate = new Date(`${dateStr}T${row.start_time}Z`);
+    const endDate = new Date(`${dateStr}T${row.end_time}Z`);
+    const duration = Math.round((endDate.getTime() - startDate.getTime()) / 60000);
+    
+    // Parse selected_days from comma-separated string
+    const recurringDays = row.selected_days
+      ? row.selected_days.split(",").map((day) => day.trim()).filter((day) => day.length > 0)
+      : [];
+    
+    return {
+      id: `recurring-${row.id}`, // Prefix to distinguish from booking IDs
+      title: row.event_title ?? "Untitled Task",
+      description: "",
+      date: dateStr,
+      meetingLink: "",
+      teamMember: row.team_member,
+      duration: duration > 0 ? duration : 60,
+      startTime: startTimeISO,
+      endTime: endTimeISO,
+      bookingTime: startTimeISO,
+      originalBookingTime: startTimeISO,
+      customerName: null,
+      customerEmail: null,
+      phoneNumber: null,
+      paymentStatus: null,
+      typeOfMeeting: null,
+      isActive: true,
+      source: "recurring_task",
+      recurringDays: recurringDays,
     };
   });
 
@@ -128,6 +183,7 @@ const Index = () => {
   const [dayViewDate, setDayViewDate] = useState<Date>(new Date());
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [dayViewEvents, setDayViewEvents] = useState<CalendarEvent[]>([]);
+  const [recurringTaskEvents, setRecurringTaskEvents] = useState<CalendarEvent[]>([]);
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
   const [isSavingAppointment, setIsSavingAppointment] = useState(false);
@@ -154,6 +210,21 @@ const Index = () => {
   const mobileSheetCloseTimeout = useRef<number | null>(null);
   const MOBILE_SHEET_TRANSITION_MS = 280;
   const getMobileEventAccent = (event: CalendarEvent): string => {
+    // Use different colors for recurring tasks
+    if (event.source === "recurring_task") {
+      const recurringTaskColors = [
+        "#ea4335", // Red
+        "#fbbc04", // Yellow
+        "#34a853", // Green
+        "#00897b", // Teal
+        "#1565c0", // Dark Blue
+        "#6f42c1", // Purple
+      ];
+      if (event.teamMember) {
+        const colorIndex = event.teamMember.charCodeAt(0) % recurringTaskColors.length;
+        return recurringTaskColors[colorIndex];
+      }
+    }
     if (event.teamMember && teamMemberColors?.get(event.teamMember)) {
       return teamMemberColors.get(event.teamMember)!;
     }
@@ -306,6 +377,99 @@ const Index = () => {
     return `${year}-${month}-${day}`;
   }, []);
 
+  const loadRecurringTasks = useCallback(async (): Promise<CalendarEvent[]> => {
+    // Get team member from localStorage
+    const teamMember = localStorage.getItem("team_member");
+
+    if (!teamMember) {
+      console.error("No team member found in localStorage");
+      setRecurringTaskEvents([]);
+      return [];
+    }
+
+    // Only fetch recurring tasks for non-admin users or for admin viewing specific member
+    // If admin, fetch for the selected team member; otherwise fetch for current user
+    let fetchForMember = teamMember;
+    if (teamMember.toLowerCase() === "admin" && selectedTeamMemberFilter) {
+      fetchForMember = selectedTeamMemberFilter;
+    } else if (teamMember.toLowerCase() === "admin") {
+      // Admin viewing all - don't fetch recurring tasks (or fetch for all members)
+      // For now, we'll not fetch for admin viewing all
+      setRecurringTaskEvents([]);
+      return [];
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from("recurring_tasks")
+        .select("id, team_member, event_title, event_date, start_time, end_time, batch_id, selected_days, created_at")
+        .eq("team_member", fetchForMember)
+        .order("event_date", { ascending: true });
+
+      if (error) {
+        console.error("Failed to load recurring tasks:", error);
+        setRecurringTaskEvents([]);
+        return [];
+      }
+
+      const normalized = data ? normalizeRecurringTasks(data as RecurringTask[]) : [];
+      setRecurringTaskEvents(normalized);
+      return normalized;
+    } catch (err) {
+      console.error("Error fetching recurring tasks:", err);
+      setRecurringTaskEvents([]);
+      return [];
+    }
+  }, [selectedTeamMemberFilter]);
+
+  const loadRecurringTasksForDate = useCallback(
+    async (date: Date): Promise<CalendarEvent[]> => {
+      // Get team member from localStorage
+      const teamMember = localStorage.getItem("team_member");
+
+      if (!teamMember) {
+        console.error("No team member found in localStorage");
+        return [];
+      }
+
+      // Format date as YYYY-MM-DD
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, "0");
+      const day = String(date.getDate()).padStart(2, "0");
+      const dateStr = `${year}-${month}-${day}`;
+
+      // Only fetch recurring tasks for non-admin users or for admin viewing specific member
+      let fetchForMember = teamMember;
+      if (teamMember.toLowerCase() === "admin" && selectedTeamMemberFilter) {
+        fetchForMember = selectedTeamMemberFilter;
+      } else if (teamMember.toLowerCase() === "admin") {
+        // Admin viewing all - don't fetch recurring tasks
+        return [];
+      }
+
+      try {
+        const { data, error } = await supabase
+          .from("recurring_tasks")
+          .select("id, team_member, event_title, event_date, start_time, end_time, batch_id, selected_days, created_at")
+          .eq("team_member", fetchForMember)
+          .eq("event_date", dateStr)
+          .order("start_time", { ascending: true });
+
+        if (error) {
+          console.error("Failed to load recurring tasks for date:", error);
+          return [];
+        }
+
+        const normalized = data ? normalizeRecurringTasks(data as RecurringTask[]) : [];
+        return normalized;
+      } catch (err) {
+        console.error("Error fetching recurring tasks for date:", err);
+        return [];
+      }
+    },
+    [selectedTeamMemberFilter]
+  );
+
   const loadEvents = useCallback(async (): Promise<CalendarEvent[]> => {
     // Get team member from localStorage
     const teamMember = localStorage.getItem("team_member");
@@ -415,15 +579,24 @@ const Index = () => {
   );
 
   useEffect(() => {
-    loadEvents();
-  }, [loadEvents]);
+    const loadAllEvents = async () => {
+      const bookingEvents = await loadEvents();
+      const recurringEvents = await loadRecurringTasks();
+      // Combine both - recurring tasks will be shown with different styling based on 'source'
+    };
+    loadAllEvents();
+  }, [loadEvents, loadRecurringTasks]);
 
   // Reload events when team member filter changes
   useEffect(() => {
     if (viewMode === "day") {
-      loadDayViewEvents(dayViewDate);
+      const loadAllDayEvents = async () => {
+        await loadDayViewEvents(dayViewDate);
+        await loadRecurringTasksForDate(dayViewDate);
+      };
+      loadAllDayEvents();
     }
-  }, [selectedTeamMemberFilter, viewMode, dayViewDate, loadDayViewEvents]);
+  }, [selectedTeamMemberFilter, viewMode, dayViewDate, loadDayViewEvents, loadRecurringTasksForDate]);
 
   const handlePrevMonth = () => {
     setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1));
@@ -461,9 +634,11 @@ const Index = () => {
     if (isMobileViewport) {
       const targetDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
       const dateKey = formatDate(targetDate);
-      const eventsForDay = events.filter((event) => event.date === dateKey);
+      const bookingEventsForDay = events.filter((event) => event.date === dateKey);
+      const recurringTasksForDay = recurringTaskEvents.filter((event) => event.date === dateKey);
+      const allEventsForDay = [...bookingEventsForDay, ...recurringTasksForDay];
       setMobileSheetDate(targetDate);
-      setMobileSheetEvents(eventsForDay);
+      setMobileSheetEvents(allEventsForDay);
       if (mobileSheetCloseTimeout.current) {
         window.clearTimeout(mobileSheetCloseTimeout.current);
         mobileSheetCloseTimeout.current = null;
@@ -502,9 +677,11 @@ const Index = () => {
   const renderEvents = useCallback(
     (date: Date): CalendarEvent[] => {
       const dateStr = formatDate(date);
-      return events.filter((event) => event.date === dateStr);
+      const bookingEvents = events.filter((event) => event.date === dateStr);
+      const recurringTasksForDate = recurringTaskEvents.filter((event) => event.date === dateStr);
+      return [...bookingEvents, ...recurringTasksForDate];
     },
-    [events, formatDate]
+    [events, recurringTaskEvents, formatDate]
   );
 
   const showEventDetails = (event: CalendarEvent) => {
@@ -850,7 +1027,7 @@ const Index = () => {
                 <div className="flex-1 overflow-hidden flex flex-col min-h-0">
                   <DayView
                     date={dayViewDate}
-                    events={dayViewEvents}
+                    events={[...dayViewEvents, ...recurringTaskEvents.filter((e) => e.date === formatDate(dayViewDate))]}
                     onEventClick={showEventDetails}
                     onDeleteEvent={handleDeleteEvent}
                     teamMemberColors={teamMemberColors}
@@ -991,6 +1168,7 @@ const Index = () => {
                     ? new Date(event.endTime).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })
                     : null;
                   const accent = getMobileEventAccent(event);
+                  const isRecurringTask = event.source === "recurring_task";
                   return (
                     <div
                       key={event.id}
@@ -998,8 +1176,8 @@ const Index = () => {
                         deletingEventId === event.id ? "opacity-50 pointer-events-none" : ""
                       }`}
                       style={{
-                        borderLeft: `5px solid ${accent}`,
-                        backgroundColor: hexToRgba(accent, 0.08),
+                        borderLeft: isRecurringTask ? `8px solid ${accent}` : `5px solid ${accent}`,
+                        backgroundColor: hexToRgba(accent, isRecurringTask ? 0.12 : 0.08),
                       }}
                     >
                       <button
@@ -1022,9 +1200,16 @@ const Index = () => {
                           <Trash2 className="h-4 w-4 text-[#9aa0a6] hover:text-[#d93025]" />
                         )}
                       </button>
-                      <p className="text-base font-semibold text-[#202124] mb-1">{event.title || "Untitled Event"}</p>
+                      <p className="text-base font-semibold text-[#202124] mb-1 flex items-center gap-2">
+                        {isRecurringTask && <span className="text-lg">📌</span>}
+                        {event.title || "Untitled Event"}
+                      </p>
                       <p className="text-sm text-[#5f6368] mb-2">
-                        Customer: {(!event.customerName?.trim() || !event.customerEmail?.trim()) ? "No customer details provided" : event.customerName}
+                        {isRecurringTask ? (
+                          <span className="font-medium text-[#005fcc]">Recurring Task</span>
+                        ) : (
+                          <>Customer: {(!event.customerName?.trim() || !event.customerEmail?.trim()) ? "No customer details provided" : event.customerName}</>
+                        )}
                       </p>
                       <div className="text-sm text-[#202124] flex flex-wrap gap-x-4 gap-y-1 mb-3">
                         <span>

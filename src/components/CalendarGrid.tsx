@@ -23,8 +23,35 @@ const CalendarGrid = ({
   isAdmin = false,
   deletingEventId,
 }: CalendarGridProps) => {
-  // Get color for event based on team member
+  // Get color for event based on team member and source
   const getEventColor = (event: CalendarEvent): { bg: string; border: string; text: string } => {
+    // Use different color palette for recurring tasks
+    if (event.source === "recurring_task") {
+      // Distinct colors for recurring tasks
+      const recurringTaskColors = [
+        "#ea4335", // Red
+        "#fbbc04", // Yellow
+        "#34a853", // Green
+        "#00897b", // Teal
+        "#1565c0", // Dark Blue
+        "#6f42c1", // Purple
+      ];
+      
+      // Assign color based on team member
+      if (event.teamMember) {
+        const colorIndex = event.teamMember.charCodeAt(0) % recurringTaskColors.length;
+        const color = recurringTaskColors[colorIndex];
+        const r = parseInt(color.slice(1, 3), 16);
+        const g = parseInt(color.slice(3, 5), 16);
+        const b = parseInt(color.slice(5, 7), 16);
+        return {
+          bg: `rgba(${r}, ${g}, ${b}, 0.15)`,
+          border: `rgba(${r}, ${g}, ${b}, 0.4)`,
+          text: color,
+        };
+      }
+    }
+    
     if (event.teamMember && teamMemberColors) {
       const color = teamMemberColors.get(event.teamMember) || "#1a73e8";
       // Convert hex to rgba for background with opacity
@@ -155,6 +182,7 @@ const CalendarGrid = ({
                         const colors = getEventColor(event);
                         const displayTitle = getEventDisplayTitle(event);
                         const emailDisplay = getCustomerEmailDisplay(event);
+                        const isRecurringTask = event.source === "recurring_task";
                         return (
                           <div
                             key={event.id}
@@ -167,15 +195,19 @@ const CalendarGrid = ({
                               color: colors.text,
                               borderWidth: "1px",
                               borderStyle: "solid",
+                              borderLeft: isRecurringTask ? `3px solid ${colors.text}` : `1px solid ${colors.border}`,
                             }}
                             onClick={(e) => {
                               e.stopPropagation();
                               onEventClick(event);
                             }}
-                            title={`${displayTitle}\nEmail: ${emailDisplay}`}
+                            title={`${displayTitle}${isRecurringTask ? " (Recurring Task)" : ""}\nEmail: ${emailDisplay}`}
                           >
                             <div className="flex items-center gap-1">
-                              <span className="flex-1 truncate">{displayTitle}</span>
+                              <span className="flex-1 truncate">
+                                {isRecurringTask && <span className="font-bold">📌 </span>}
+                                {displayTitle}
+                              </span>
                               <button
                                 type="button"
                                 aria-label="Delete event"
