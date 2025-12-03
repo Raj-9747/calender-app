@@ -180,9 +180,9 @@ const CalendarGrid = ({
 
                       {dayEvents.map((event) => {
                         const colors = getEventColor(event);
-                        const displayTitle = getEventDisplayTitle(event);
-                        const emailDisplay = getCustomerEmailDisplay(event);
                         const isRecurringTask = event.source === "recurring_task";
+                        const displayTitle = isRecurringTask ? "Recurring Task" : getEventDisplayTitle(event);
+                        const emailDisplay = getCustomerEmailDisplay(event);
                         return (
                           <div
                             key={event.id}
@@ -201,7 +201,7 @@ const CalendarGrid = ({
                               e.stopPropagation();
                               onEventClick(event);
                             }}
-                            title={`${displayTitle}${isRecurringTask ? " (Recurring Task)" : ""}\nEmail: ${emailDisplay}`}
+                            title={`${displayTitle}\n${isRecurringTask ? event.title : `Email: ${emailDisplay}`}`}
                           >
                             <div className="flex items-center gap-1">
                               <span className="flex-1 truncate">

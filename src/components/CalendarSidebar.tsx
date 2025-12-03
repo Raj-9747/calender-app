@@ -219,7 +219,8 @@ const CalendarSidebar = ({
           )}
 
           {upcomingEvents.map((event) => {
-            const displayTitle = getEventDisplayTitle(event);
+            const isRecurring = event.source === "recurring_task";
+            const displayTitle = isRecurring ? "Recurring Task" : getEventDisplayTitle(event);
             const customerName = getCustomerNameDisplay(event);
             const customerEmail = getCustomerEmailDisplay(event);
             const missingDetails = !event.customerName?.trim() || !event.customerEmail?.trim();
@@ -237,7 +238,7 @@ const CalendarSidebar = ({
               `}
               style={{ borderLeft: `5px solid ${getEventAccent(event)}` }}
                   onClick={() => runActionAndCollapse(() => onEventClick(event))}
-              title={`${displayTitle}\nEmail: ${customerEmail}`}
+              title={`${displayTitle}\n${isRecurring ? event.title : `Email: ${customerEmail}`}`}
             >
               <button
                 type="button"
@@ -275,10 +276,12 @@ const CalendarSidebar = ({
                   </span>
                 )}
 
-                <div className="text-sm text-[#5f6368] leading-relaxed">
-                  <p>{missingDetails ? "No customer details provided" : `Customer Name: ${customerName}`}</p>
-                  <p className="text-xs">{missingDetails ? "No customer details provided" : `Email: ${customerEmail}`}</p>
-                </div>
+                {!isRecurring && (
+                  <div className="text-sm text-[#5f6368] leading-relaxed">
+                    <p>{missingDetails ? "No customer details provided" : `Customer Name: ${customerName}`}</p>
+                    <p className="text-xs">{missingDetails ? "No customer details provided" : `Email: ${customerEmail}`}</p>
+                  </div>
+                )}
 
                 {event.description && (
                   <p className="text-sm text-[#5f6368] leading-relaxed line-clamp-2">

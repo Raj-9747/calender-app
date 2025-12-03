@@ -188,10 +188,10 @@ export default function DayView({
                       );
                       const bg = hexToRgba(color, 0.1);
                       const border = hexToRgba(color, 0.3);
-                      const isRecurringTask = ev.source === "recurring_task";
 
                       const emailLabel = getCustomerEmailDisplay(ev);
-                      const displayTitle = getEventDisplayTitle(ev);
+                      const isRecurringTask = ev.source === "recurring_task";
+                      const displayTitle = isRecurringTask ? "Recurring Task" : getEventDisplayTitle(ev);
                       return (
                         <div
                           key={ev.id}
@@ -207,7 +207,7 @@ export default function DayView({
                             borderLeftWidth: isRecurringTask ? "8px" : "4px",
                           }}
                           onClick={() => onEventClick(ev)}
-                          title={`${displayTitle}${isRecurringTask ? " (Recurring Task)" : ""}\nEmail: ${emailLabel}`}
+                          title={`${displayTitle}\n${isRecurringTask ? ev.title : `Email: ${emailLabel}`}`}
                         >
                           <div className="p-2 flex flex-col h-full gap-1">
                             <div className="flex items-start justify-between gap-2">

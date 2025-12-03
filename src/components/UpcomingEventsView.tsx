@@ -266,7 +266,8 @@ const UpcomingEventsView = ({
                       const customerName = getCustomerNameDisplay(event);
                       const customerEmail = getCustomerEmailDisplay(event);
                       const customerPhone = getCustomerPhoneDisplay(event);
-                      const displayTitle = getEventDisplayTitle(event);
+                      const isRecurring = event.source === "recurring_task";
+                      const displayTitle = isRecurring ? "Recurring Task" : getEventDisplayTitle(event);
                       const missingDetails = !event.customerName?.trim() || !event.customerEmail?.trim();
                       return (
                         <div
@@ -302,15 +303,19 @@ const UpcomingEventsView = ({
                                 {dateLabel}
                               </div>
                               <p className="text-lg font-semibold text-[#202124]">{displayTitle}</p>
-                              <p className="text-sm text-[#5f6368]">
-                                {missingDetails ? "No customer details provided" : `Customer Name: ${customerName}`}
-                              </p>
-                              <p className="text-sm text-[#5f6368]">
-                                {missingDetails ? "No customer details provided" : `Email: ${customerEmail}`}
-                              </p>
-                              <p className="text-sm text-[#5f6368]">
-                                Phone: {customerPhone}
-                              </p>
+                              {!isRecurring && (
+                                <>
+                                  <p className="text-sm text-[#5f6368]">
+                                    {missingDetails ? "No customer details provided" : `Customer Name: ${customerName}`}
+                                  </p>
+                                  <p className="text-sm text-[#5f6368]">
+                                    {missingDetails ? "No customer details provided" : `Email: ${customerEmail}`}
+                                  </p>
+                                  <p className="text-sm text-[#5f6368]">
+                                    Phone: {customerPhone}
+                                  </p>
+                                </>
+                              )}
                               {event.description && (
                                 <p className="text-sm text-[#5f6368] line-clamp-2">{event.description}</p>
                               )}
