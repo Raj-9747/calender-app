@@ -181,7 +181,7 @@ const CalendarGrid = ({
                       {dayEvents.map((event) => {
                         const colors = getEventColor(event);
                         const isRecurringTask = event.source === "recurring_task";
-                        const displayTitle = isRecurringTask ? "Recurring Task" : getEventDisplayTitle(event);
+                        const displayTitle = isRecurringTask ? event.title : getEventDisplayTitle(event);
                         const emailDisplay = getCustomerEmailDisplay(event);
                         return (
                           <div

@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/select";
 import { X } from "lucide-react";
 
-const defaultTeamMembers = ["Gauri", "Test", "Admin"];
+const defaultTeamMembers = ["Gauri", "Merilo", "Monica", "Shafoli", "Farahnaz" ];
 
 interface AppointmentScheduleModalProps {
   isOpen: boolean;

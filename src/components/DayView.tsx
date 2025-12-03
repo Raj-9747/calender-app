@@ -87,22 +87,18 @@ export default function DayView({
   );
 
   const positionedEvents = useMemo(() => {
-    return events
+    const base = events
       .map((ev) => {
         if (!ev.bookingTime) return null;
 
         const start = new Date(ev.bookingTime);
         const duration = ev.duration ?? 60;
-
-        const minutesSinceMidnight =
-          start.getUTCHours() * 60 + start.getUTCMinutes();
-
+        const minutesSinceMidnight = start.getUTCHours() * 60 + start.getUTCMinutes();
         const top = minutesSinceMidnight * PIXELS_PER_MINUTE;
         const height = Math.max(duration * PIXELS_PER_MINUTE, 40);
-
         const end = new Date(start.getTime() + duration * 60000);
-
-        return { ev, start, end, top, height };
+        const hour = start.getUTCHours();
+        return { ev, start, end, top, height, hour };
       })
       .filter(Boolean) as {
       ev: CalendarEvent;
@@ -110,7 +106,63 @@ export default function DayView({
       end: Date;
       top: number;
       height: number;
+      hour: number;
     }[];
+
+    const byHour: Record<number, typeof base> = {};
+    base.forEach((item) => {
+      byHour[item.hour] ??= [];
+      byHour[item.hour].push(item);
+    });
+
+    const laidOut: Array<{
+      ev: CalendarEvent;
+      start: Date;
+      end: Date;
+      top: number;
+      height: number;
+      columnIndex: number;
+      totalColumns: number;
+    }> = [];
+
+    Object.keys(byHour).forEach((key) => {
+      const group = byHour[Number(key)].sort((a, b) => a.start.getTime() - b.start.getTime());
+      const columnsEnd: number[] = [];
+      const assigned: Array<number> = [];
+
+      group.forEach((item, idx) => {
+        let placedAt = -1;
+        for (let c = 0; c < columnsEnd.length; c++) {
+          if (columnsEnd[c] <= item.start.getTime()) {
+            placedAt = c;
+            break;
+          }
+        }
+        if (placedAt === -1) {
+          columnsEnd.push(item.end.getTime());
+          placedAt = columnsEnd.length - 1;
+        } else {
+          columnsEnd[placedAt] = item.end.getTime();
+        }
+        assigned[idx] = placedAt;
+      });
+
+      const total = Math.max(columnsEnd.length, 1);
+      group.forEach((item, idx) => {
+        laidOut.push({
+          ev: item.ev,
+          start: item.start,
+          end: item.end,
+          top: item.top,
+          height: item.height,
+          columnIndex: assigned[idx],
+          totalColumns: total,
+        });
+      });
+    });
+
+    // keep overall order stable
+    return laidOut.sort((a, b) => a.top - b.top || a.columnIndex - b.columnIndex);
   }, [events]);
 
   return (
@@ -181,7 +233,7 @@ export default function DayView({
 
                   {/* EVENTS */}
                   {positionedEvents.map(
-                    ({ ev, start, end, top, height }) => {
+                    ({ ev, start, end, top, height, columnIndex, totalColumns }) => {
                       const color = getEventColor(
                         ev,
                         teamMemberColors
@@ -191,16 +243,20 @@ export default function DayView({
 
                       const emailLabel = getCustomerEmailDisplay(ev);
                       const isRecurringTask = ev.source === "recurring_task";
-                      const displayTitle = isRecurringTask ? "Recurring Task" : getEventDisplayTitle(ev);
+                      const displayTitle = isRecurringTask ? ev.title : getEventDisplayTitle(ev);
+                      const widthPercent = 100 / totalColumns;
+                      const leftPercent = columnIndex * widthPercent;
                       return (
                         <div
                           key={ev.id}
-                          className={`absolute left-2 right-2 rounded-md shadow-sm border-l-4 cursor-pointer hover:shadow-md ${
+                          className={`absolute rounded-md shadow-sm border-l-4 cursor-pointer hover:shadow-md ${
                             deletingEventId === ev.id ? "opacity-50 pointer-events-none" : ""
                           } ${isRecurringTask ? "border-l-8" : ""}`}
                           style={{
                             top,
                             height,
+                            left: `${leftPercent}%`,
+                            width: `calc(${widthPercent}% - 8px)`,
                             backgroundColor: hexToRgba(color, isRecurringTask ? 0.15 : 0.1),
                             borderColor: hexToRgba(color, isRecurringTask ? 0.4 : 0.3),
                             borderLeftColor: color,
@@ -241,7 +297,7 @@ export default function DayView({
 
                             <div className="text-[11px] text-[#5f6368]">
                               {isRecurringTask ? (
-                                <span className="font-medium">Recurring Task</span>
+                                <span className="font-medium">{ev.title}</span>
                               ) : (
                                 (!ev.customerName?.trim() || !ev.customerEmail?.trim()) ? CUSTOMER_NAME_FALLBACK : `Email: ${emailLabel}`
                               )}

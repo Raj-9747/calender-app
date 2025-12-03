@@ -267,7 +267,7 @@ const UpcomingEventsView = ({
                       const customerEmail = getCustomerEmailDisplay(event);
                       const customerPhone = getCustomerPhoneDisplay(event);
                       const isRecurring = event.source === "recurring_task";
-                      const displayTitle = isRecurring ? "Recurring Task" : getEventDisplayTitle(event);
+                      const displayTitle = isRecurring ? event.title : getEventDisplayTitle(event);
                       const missingDetails = !event.customerName?.trim() || !event.customerEmail?.trim();
                       return (
                         <div

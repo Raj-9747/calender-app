@@ -133,33 +133,35 @@ const normalizeEvents = (rows: SupabaseBookingRow[]): CalendarEvent[] =>
 
 const normalizeRecurringTasks = (rows: RecurringTask[]): CalendarEvent[] =>
   rows.map((row) => {
-    // Parse start and end times
-    const dateStr = row.event_date; // Already in YYYY-MM-DD format
-    const startTimeISO = new Date(`${dateStr}T${row.start_time}Z`).toISOString();
-    const endTimeISO = new Date(`${dateStr}T${row.end_time}Z`).toISOString();
-    
-    // Calculate duration in minutes
-    const startDate = new Date(`${dateStr}T${row.start_time}Z`);
-    const endDate = new Date(`${dateStr}T${row.end_time}Z`);
-    const duration = Math.round((endDate.getTime() - startDate.getTime()) / 60000);
-    
-    // Parse selected_days from comma-separated string
+    const dateStr = row.event_date;
+    const startUtc = new Date(`${dateStr}T${row.start_time}Z`);
+    const endUtc = new Date(`${dateStr}T${row.end_time}Z`);
+    const adjustedStart = new Date(startUtc.getTime() - DISPLAY_TIME_OFFSET_MS);
+    const adjustedEnd = new Date(endUtc.getTime() - DISPLAY_TIME_OFFSET_MS);
+
+    const duration = Math.round((endUtc.getTime() - startUtc.getTime()) / 60000);
+
+    const year = adjustedStart.getFullYear();
+    const month = String(adjustedStart.getMonth() + 1).padStart(2, "0");
+    const day = String(adjustedStart.getDate()).padStart(2, "0");
+    const shiftedDateStr = `${year}-${month}-${day}`;
+
     const recurringDays = row.selected_days
       ? row.selected_days.split(",").map((day) => day.trim()).filter((day) => day.length > 0)
       : [];
-    
+
     return {
-      id: `recurring-${row.id}`, // Prefix to distinguish from booking IDs
+      id: `recurring-${row.id}`,
       title: row.event_title ?? "Untitled Task",
       description: "",
-      date: dateStr,
+      date: shiftedDateStr,
       meetingLink: "",
       teamMember: row.team_member,
       duration: duration > 0 ? duration : 60,
-      startTime: startTimeISO,
-      endTime: endTimeISO,
-      bookingTime: startTimeISO,
-      originalBookingTime: startTimeISO,
+      startTime: adjustedStart.toISOString(),
+      endTime: adjustedEnd.toISOString(),
+      bookingTime: adjustedStart.toISOString(),
+      originalBookingTime: startUtc.toISOString(),
       customerName: null,
       customerEmail: null,
       phoneNumber: null,
@@ -172,7 +174,7 @@ const normalizeRecurringTasks = (rows: RecurringTask[]): CalendarEvent[] =>
   });
 
 type ViewMode = "month" | "day" | "upcoming";
-const defaultTeamMembers = ["Gauri", "Monica", "Shafoli","Farahnaz","Merilo"];
+const defaultTeamMembers = ["Gauri", "Merilo", "Monica", "Shafoli", "Farahnaz" ];
 
 const Index = () => {
   const navigate = useNavigate();
@@ -321,7 +323,8 @@ const Index = () => {
         new Set(data.map((row) => row.team_member).filter((member): member is string => member !== null))
       ).sort();
 
-      const mergedMembers = Array.from(new Set([...defaultTeamMembers, ...distinctMembers]));
+      const nonDefault = distinctMembers.filter((m) => !defaultTeamMembers.includes(m));
+      const mergedMembers = [...defaultTeamMembers, ...nonDefault];
       setAvailableTeamMembers(mergedMembers);
     } catch (err) {
       console.error("Error fetching team members:", err);
@@ -652,12 +655,30 @@ const Index = () => {
   };
 
   const handleSidebarDateSelect = (date: Date) => {
+    const today = new Date();
+    const isToday =
+      date.getFullYear() === today.getFullYear() &&
+      date.getMonth() === today.getMonth() &&
+      date.getDate() === today.getDate();
+
+    const selectedDateObj = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    setCurrentDate(selectedDateObj);
+
+    if (isToday) {
+      setDayViewDate(selectedDateObj);
+      setViewMode("day");
+      loadDayViewEvents(selectedDateObj);
+      if (!isDesktopViewport) {
+        closeSidebar();
+      }
+      return;
+    }
+
     if (isMobileViewport) {
       handleDateClick(date);
       return;
     }
-    const selectedDateObj = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-    setCurrentDate(selectedDateObj);
+
     setDayViewDate(selectedDateObj);
     setViewMode("day");
     loadDayViewEvents(selectedDateObj);
