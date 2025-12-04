@@ -11,6 +11,7 @@ import CalendarSidebar from "@/components/CalendarSidebar";
 import AppointmentScheduleModal from "@/components/AppointmentScheduleModal";
 import DeleteEventModal from "@/components/DeleteEventModal";
 import { toast } from "sonner";
+import { getColorForTitle } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -212,7 +213,18 @@ const Index = () => {
   const mobileSheetCloseTimeout = useRef<number | null>(null);
   const MOBILE_SHEET_TRANSITION_MS = 280;
   const getMobileEventAccent = (event: CalendarEvent): string => {
-    // Use different colors for recurring tasks
+    // Title-based color takes highest precedence for recurring tasks
+    if (event.source === "recurring_task") {
+      const titleColor = getColorForTitle(event.title);
+      if (titleColor) return titleColor;
+    }
+
+    // Prefer explicit team-member color mapping so recurring tasks match bookings.
+    if (event.teamMember && teamMemberColors?.get(event.teamMember)) {
+      return teamMemberColors.get(event.teamMember)!;
+    }
+
+    // Fallback palette for recurring tasks (if no explicit mapping exists)
     if (event.source === "recurring_task") {
       const recurringTaskColors = [
         "#ea4335", // Red
@@ -226,10 +238,9 @@ const Index = () => {
         const colorIndex = event.teamMember.charCodeAt(0) % recurringTaskColors.length;
         return recurringTaskColors[colorIndex];
       }
+      return recurringTaskColors[0];
     }
-    if (event.teamMember && teamMemberColors?.get(event.teamMember)) {
-      return teamMemberColors.get(event.teamMember)!;
-    }
+
     return "#1a73e8";
   };
   const hexToRgba = (hex: string, alpha: number): string => {
@@ -352,11 +363,14 @@ const Index = () => {
       "#ff9800", // Orange
     ];
 
+    // Ensure available team members (defaults + fetched) are included so recurring-only members get colors
     const members = Array.from(
       new Set(
-        [...events, ...dayViewEvents]
-          .map((e) => e.teamMember)
-          .filter((m): m is string => !!m)
+        [
+          ...availableTeamMembers,
+          ...events.map((e) => e.teamMember),
+          ...dayViewEvents.map((e) => e.teamMember),
+        ].filter((m): m is string => !!m)
       )
     ).sort();
 
@@ -1127,6 +1141,7 @@ const Index = () => {
           setIsDetailsModalOpen(false);
           setSelectedEvent(null);
         }}
+        teamMemberColors={teamMemberColors}
       />
 
       <DeleteEventModal

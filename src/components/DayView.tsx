@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { CalendarEvent } from "@/pages/Index";
+import { getColorForTitle } from "@/lib/utils";
 import { Trash2 } from "lucide-react";
 import {
   getCustomerEmailDisplay,
@@ -36,8 +37,18 @@ const getEventColor = (
   event: CalendarEvent,
   colors?: Map<string, string>,
 ): string => {
-  // Use different colors for recurring tasks
+  // If we have an explicit color for the team member, prefer it (so recurring tasks match bookings)
+  if (event.teamMember && colors) {
+    const mapped = colors.get(event.teamMember);
+    if (mapped) return mapped;
+  }
+
+  // Fallback palette for recurring tasks
   if (event.source === "recurring_task") {
+    // First prefer title-based mapping (exact colors from screenshot)
+    const titleColor = getColorForTitle(event.title);
+    if (titleColor) return titleColor;
+
     const recurringTaskColors = [
       "#ea4335", // Red
       "#fbbc04", // Yellow
@@ -46,16 +57,13 @@ const getEventColor = (
       "#1565c0", // Dark Blue
       "#6f42c1", // Purple
     ];
-    
     if (event.teamMember) {
       const colorIndex = event.teamMember.charCodeAt(0) % recurringTaskColors.length;
       return recurringTaskColors[colorIndex];
     }
+    return recurringTaskColors[0];
   }
-  
-  if (event.teamMember && colors) {
-    return colors.get(event.teamMember) || "#1a73e8";
-  }
+
   return "#1a73e8";
 };
 

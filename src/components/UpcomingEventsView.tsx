@@ -25,6 +25,7 @@ import {
   getCustomerPhoneDisplay,
   getEventDisplayTitle,
 } from "@/lib/eventDisplay";
+import { getColorForTitle } from "@/lib/utils";
 
 type SectionKey = "today" | "tomorrow" | "thisWeek" | "nextWeek" | "later";
 
@@ -108,6 +109,12 @@ const getAccentColor = (
   event: CalendarEvent,
   teamMemberColors?: Map<string, string>,
 ) => {
+  // Title-based color first (for recurring tasks / keyword matches)
+  if (event.source === "recurring_task") {
+    const titleColor = getColorForTitle(event.title);
+    if (titleColor) return titleColor;
+  }
+
   if (event.teamMember && teamMemberColors) {
     return teamMemberColors.get(event.teamMember) ?? "#1a73e8";
   }

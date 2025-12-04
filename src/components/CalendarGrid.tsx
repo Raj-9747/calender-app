@@ -1,4 +1,5 @@
 import { CalendarEvent } from "@/pages/Index";
+import { getColorForTitle } from "@/lib/utils";
 import { getCustomerEmailDisplay, getEventDisplayTitle } from "@/lib/eventDisplay";
 import { Trash2 } from "lucide-react";
 
@@ -27,7 +28,20 @@ const CalendarGrid = ({
   const getEventColor = (event: CalendarEvent): { bg: string; border: string; text: string } => {
     // Use different color palette for recurring tasks
     if (event.source === "recurring_task") {
-      // Distinct colors for recurring tasks
+      // Title-based color mapping takes precedence so recurring tasks match the screenshot
+      const titleColor = getColorForTitle(event.title);
+      if (titleColor) {
+        const r = parseInt(titleColor.slice(1, 3), 16);
+        const g = parseInt(titleColor.slice(3, 5), 16);
+        const b = parseInt(titleColor.slice(5, 7), 16);
+        return {
+          bg: `rgba(${r}, ${g}, ${b}, 0.15)`,
+          border: `rgba(${r}, ${g}, ${b}, 0.4)`,
+          text: titleColor,
+        };
+      }
+
+      // Distinct colors for recurring tasks (fallback)
       const recurringTaskColors = [
         "#ea4335", // Red
         "#fbbc04", // Yellow

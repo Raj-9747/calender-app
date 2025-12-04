@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { X, Video, Clock, User, Trash2, Calendar } from "lucide-react";
 import { CalendarEvent } from "@/pages/Index";
+import { getColorForTitle } from "@/lib/utils";
 import {
   getCustomerEmailDisplay,
   getCustomerNameDisplay,
@@ -13,11 +14,12 @@ interface EventDetailsModalProps {
   event: CalendarEvent | null;
   onClose: () => void;
   onDeleteEvent: (event: CalendarEvent) => void;
+  teamMemberColors?: Map<string, string>;
 }
 
 const DISPLAY_TIMEZONE = "UTC";
 
-const EventDetailsModal = ({ isOpen, event, onClose, onDeleteEvent }: EventDetailsModalProps) => {
+const EventDetailsModal = ({ isOpen, event, onClose, onDeleteEvent, teamMemberColors }: EventDetailsModalProps) => {
   if (!isOpen || !event) return null;
 
   const formatDateDisplay = (dateStr: string): string => {
@@ -65,6 +67,7 @@ const EventDetailsModal = ({ isOpen, event, onClose, onDeleteEvent }: EventDetai
 
   // Render recurring task layout
   if (event.source === "recurring_task") {
+    const titleColor = getColorForTitle(event.title) || (event.teamMember && typeof teamMemberColors !== "undefined" ? teamMemberColors.get(event.teamMember) : undefined) || "#1a73e8";
     return (
       <div
         id="eventDetails"
@@ -74,6 +77,7 @@ const EventDetailsModal = ({ isOpen, event, onClose, onDeleteEvent }: EventDetai
         <div
           className="relative bg-card rounded-lg shadow-[var(--shadow-lg)] max-w-md w-full p-6 animate-in fade-in zoom-in duration-200"
           onClick={(e) => e.stopPropagation()}
+          style={{ borderLeft: `6px solid ${titleColor}` }}
         >
           <button
             className="absolute top-4 right-4 z-10 rounded-full p-2 text-muted-foreground transition-colors hover:bg-muted/40 hover:text-foreground"
@@ -181,6 +185,8 @@ const EventDetailsModal = ({ isOpen, event, onClose, onDeleteEvent }: EventDetai
   const customerEmailDisplayBooking = getCustomerEmailDisplay(event);
   const customerPhoneDisplayBooking = getCustomerPhoneDisplay(event);
 
+  const titleColorBooking = getColorForTitle(event.title) || (event.teamMember && typeof teamMemberColors !== "undefined" ? teamMemberColors.get(event.teamMember) : undefined) || "#1a73e8";
+
   return (
     <div
       id="eventDetails"
@@ -190,6 +196,7 @@ const EventDetailsModal = ({ isOpen, event, onClose, onDeleteEvent }: EventDetai
       <div
         className="relative bg-card rounded-lg shadow-[var(--shadow-lg)] max-w-md w-full p-6 animate-in fade-in zoom-in duration-200"
         onClick={(e) => e.stopPropagation()}
+        style={{ borderLeft: `6px solid ${titleColorBooking}` }}
       >
         <button
           className="absolute top-4 right-4 z-10 rounded-full p-2 text-muted-foreground transition-colors hover:bg-muted/40 hover:text-foreground"

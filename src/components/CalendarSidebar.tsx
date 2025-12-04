@@ -3,7 +3,7 @@ import { Plus, Clock8, CalendarClock, X, Trash2 } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import { Button } from "@/components/ui/button";
 import type { CalendarEvent } from "@/pages/Index";
-import { cn } from "@/lib/utils";
+import { cn, getColorForTitle } from "@/lib/utils";
 import {
   getCustomerEmailDisplay,
   getCustomerNameDisplay,
@@ -94,6 +94,12 @@ const CalendarSidebar = ({
   };
 
   const getEventAccent = (event: CalendarEvent) => {
+    // Title-based color first for recurring tasks
+    if (event.source === "recurring_task") {
+      const titleColor = getColorForTitle(event.title);
+      if (titleColor) return titleColor;
+    }
+
     if (event.teamMember && teamMemberColors) {
       return teamMemberColors.get(event.teamMember) ?? "#1a73e8";
     }
