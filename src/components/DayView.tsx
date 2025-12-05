@@ -97,17 +97,21 @@ export default function DayView({
   const positionedEvents = useMemo(() => {
     const base = events
       .map((ev) => {
-        if (!ev.bookingTime) return null;
+        const startIso = ev.startTime ?? ev.bookingTime;
+        if (!startIso) return null;
 
-        const start = new Date(ev.bookingTime);
+        const start = new Date(startIso);
         const duration = ev.duration ?? 60;
         const end = new Date(start.getTime() + duration * 60000);
-        const adjustedStart = new Date(start.getTime() - UI_OFFSET_MS);
+        const isRecurringTask = ev.source === "recurring_task";
+        const offsetMs = isRecurringTask ? 0 : UI_OFFSET_MS;
+        const adjustedStart = new Date(start.getTime() - offsetMs);
+        const adjustedEnd = new Date(end.getTime() - offsetMs);
         const minutesSinceMidnight = adjustedStart.getHours() * 60 + adjustedStart.getMinutes();
 
         const top = minutesSinceMidnight * PIXELS_PER_MINUTE;
         const height = Math.max(duration * PIXELS_PER_MINUTE, 40);
-        return { ev, start, end, top, height };
+        return { ev, start, end, adjustedStart, adjustedEnd, top, height };
       })
       .filter(Boolean) as {
       ev: CalendarEvent;
@@ -258,7 +262,7 @@ export default function DayView({
 
                   {/* EVENTS */}
                   {positionedEvents.map(
-                    ({ ev, start, end, top, height, columnIndex, totalColumns }) => {
+                    ({ ev, start, end, adjustedStart, adjustedEnd, top, height, columnIndex, totalColumns }) => {
                       const color = getEventColor(
                         ev,
                         teamMemberColors
@@ -317,7 +321,7 @@ export default function DayView({
                             </div>
 
                             <div className="text-xs text-[#5f6368] truncate min-w-0">
-                              {format12(new Date(start.getTime() - UI_OFFSET_MS))} – {format12(new Date(end.getTime() - UI_OFFSET_MS))}
+                              {format12(adjustedStart)} – {format12(adjustedEnd)}
                             </div>
 
                             <div className="text-[11px] text-[#5f6368] truncate min-w-0">
