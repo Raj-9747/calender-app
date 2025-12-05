@@ -89,28 +89,20 @@ const shiftBookingTime = (isoString?: string): Date | null => {
   if (!isoString) return null;
   const parsed = new Date(isoString);
   if (Number.isNaN(parsed.getTime())) return null;
-  return new Date(parsed.getTime() - DISPLAY_TIME_OFFSET_MS);
+  return parsed;
 };
 
 const normalizeEvents = (rows: SupabaseBookingRow[]): CalendarEvent[] =>
   rows.map((row) => {
-    const adjustedStartDate = shiftBookingTime(row.booking_time);
-    const fallbackDate =
-      adjustedStartDate ??
-      (row.booking_time ? new Date(row.booking_time) : new Date());
-    // Format date as YYYY-MM-DD
-    const year = fallbackDate.getFullYear();
-    const month = String(fallbackDate.getMonth() + 1).padStart(2, "0");
-    const day = String(fallbackDate.getDate()).padStart(2, "0");
+    const start = row.booking_time ? new Date(row.booking_time) : new Date();
+    const year = start.getFullYear();
+    const month = String(start.getMonth() + 1).padStart(2, "0");
+    const day = String(start.getDate()).padStart(2, "0");
     const dateStr = `${year}-${month}-${day}`;
-    
-    // Calculate start and end times
-    const duration = row.duration ?? 60; // Default to 60 minutes if not provided
-    const startTimeISO = adjustedStartDate?.toISOString();
-    const endTimeISO = adjustedStartDate
-      ? new Date(adjustedStartDate.getTime() + duration * 60000).toISOString()
-      : undefined;
-    
+
+    const duration = row.duration ?? 60;
+    const end = new Date(start.getTime() + duration * 60000);
+
     return {
       id: row.id,
       title: row.product_name ?? "",
@@ -119,9 +111,9 @@ const normalizeEvents = (rows: SupabaseBookingRow[]): CalendarEvent[] =>
       meetingLink: row.meet_link ?? "",
       teamMember: row.team_member ?? undefined,
       duration: duration,
-      startTime: startTimeISO,
-      endTime: endTimeISO,
-      bookingTime: startTimeISO ?? row.booking_time,
+      startTime: row.booking_time,
+      endTime: end.toISOString(),
+      bookingTime: row.booking_time,
       originalBookingTime: row.booking_time,
       customerName: row.customer_name,
       customerEmail: row.customer_email,
@@ -135,14 +127,13 @@ const normalizeEvents = (rows: SupabaseBookingRow[]): CalendarEvent[] =>
 
 const normalizeRecurringTasks = (rows: RecurringTask[]): CalendarEvent[] =>
   rows.map((row) => {
-    const dateStr = row.event_date; // YYYY-MM-DD
-    // Treat DB times as UTC then apply the same display offset used for bookings
-    const startUtc = new Date(`${dateStr}T${row.start_time}Z`);
-    const endUtc = new Date(`${dateStr}T${row.end_time}Z`);
-    const adjustedStart = new Date(startUtc.getTime() - DISPLAY_TIME_OFFSET_MS);
-    const adjustedEnd = new Date(endUtc.getTime() - DISPLAY_TIME_OFFSET_MS);
+    const dateStr = row.event_date;
+    const startLocalStr = `${dateStr}T${row.start_time}`;
+    const endLocalStr = `${dateStr}T${row.end_time}`;
 
-    const duration = Math.round((endUtc.getTime() - startUtc.getTime()) / 60000);
+    const start = new Date(startLocalStr);
+    const end = new Date(endLocalStr);
+    const duration = Math.round((end.getTime() - start.getTime()) / 60000);
 
     const recurringDays = row.selected_days
       ? row.selected_days.split(",").map((d) => d.trim()).filter((d) => d.length > 0)
@@ -156,10 +147,10 @@ const normalizeRecurringTasks = (rows: RecurringTask[]): CalendarEvent[] =>
       meetingLink: "",
       teamMember: row.team_member,
       duration: duration > 0 ? duration : 60,
-      startTime: adjustedStart.toISOString(),
-      endTime: adjustedEnd.toISOString(),
-      bookingTime: adjustedStart.toISOString(),
-      originalBookingTime: startUtc.toISOString(),
+      startTime: startLocalStr,
+      endTime: endLocalStr,
+      bookingTime: startLocalStr,
+      originalBookingTime: startLocalStr,
       customerName: null,
       customerEmail: null,
       phoneNumber: null,
@@ -548,16 +539,11 @@ const Index = () => {
       const day = String(date.getDate()).padStart(2, "0");
       const dateStr = `${year}-${month}-${day}`;
 
-      const utcStart = new Date(`${dateStr}T00:00:00Z`);
-      const rangeStart = new Date(utcStart.getTime() + DISPLAY_TIME_OFFSET_MS);
-      const rangeEnd = new Date(rangeStart.getTime() + DAY_IN_MS);
-
-      // Build query - filter by date
+      // Build query
       let query = supabase
         .from("bookings")
         .select("id, product_name, summary, booking_time, meet_link, team_member, duration, customer_name, customer_email, phone_number, payment_status, typeOfMeeting, isActive")
-        .gte("booking_time", rangeStart.toISOString())
-        .lt("booking_time", rangeEnd.toISOString());
+        .order("booking_time", { ascending: true });
 
       // If admin and a specific team member is selected, filter by that member
       if (teamMember.toLowerCase() === "admin" && selectedTeamMemberFilter) {
@@ -568,10 +554,8 @@ const Index = () => {
       }
       // If admin and no filter selected, show all events (no filter applied)
 
-      // Order by booking_time and include active (or legacy null) records
-      query = query
-        .order("booking_time", { ascending: true })
-        .or("isActive.eq.true,isActive.is.null");
+      // Include active (or legacy null) records
+      query = query.or("isActive.eq.true,isActive.is.null");
 
       const { data, error } = await query;
 
@@ -813,9 +797,13 @@ const Index = () => {
       }
 
       const formatTimestamp = (date: Date) => {
-        const iso = date.toISOString(); // 2025-11-14T18:11:06.115Z
-        const [datePart, timePart] = iso.split("T");
-        return `${datePart} ${timePart.replace("Z", "+00")}`;
+        const y = date.getFullYear();
+        const m = String(date.getMonth() + 1).padStart(2, "0");
+        const d = String(date.getDate()).padStart(2, "0");
+        const hh = String(date.getHours()).padStart(2, "0");
+        const mm = String(date.getMinutes()).padStart(2, "0");
+        const ss = "00";
+        return `${y}-${m}-${d}T${hh}:${mm}:${ss}`;
       };
 
       const storedTeamMember = localStorage.getItem("team_member");

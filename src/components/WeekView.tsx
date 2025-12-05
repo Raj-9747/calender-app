@@ -20,7 +20,6 @@ interface WeekViewProps {
 
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
 const DAYS = Array.from({ length: 7 }, (_, i) => i);
-const DISPLAY_TIMEZONE = "UTC";
 
 const PIXELS_PER_MINUTE = 3;
 const HOUR_HEIGHT = 60 * PIXELS_PER_MINUTE;      // 180px
@@ -31,7 +30,6 @@ const format12 = (date: Date): string =>
     hour: "numeric",
     minute: "2-digit",
     hour12: true,
-    timeZone: DISPLAY_TIMEZONE,
   });
 
 const getEventColor = (
@@ -100,7 +98,7 @@ export default function WeekView({
           if (!startIso) return null;
           const start = new Date(startIso);
           const duration = ev.duration ?? 60;
-          const minutesSinceMidnight = start.getUTCHours() * 60 + start.getUTCMinutes();
+          const minutesSinceMidnight = start.getHours() * 60 + start.getMinutes();
           const top = minutesSinceMidnight * PIXELS_PER_MINUTE;
           const height = Math.max(duration * PIXELS_PER_MINUTE, 40);
           const end = new Date(start.getTime() + duration * 60000);

@@ -19,18 +19,16 @@ interface DayViewProps {
 }
 
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
-const DISPLAY_TIMEZONE = "UTC";
 
 const PIXELS_PER_MINUTE = 3;
 const HOUR_HEIGHT = 60 * PIXELS_PER_MINUTE;      // 180px
 const TOTAL_HEIGHT = 24 * 60 * PIXELS_PER_MINUTE; // 4320px
 
-const format12 = (date: Date, useUTC = true): string =>
+const format12 = (date: Date): string =>
   date.toLocaleTimeString("en-US", {
     hour: "numeric",
     minute: "2-digit",
     hour12: true,
-    timeZone: useUTC ? DISPLAY_TIMEZONE : undefined,
   });
 
 const getEventColor = (
@@ -101,7 +99,7 @@ export default function DayView({
 
         const start = new Date(ev.bookingTime);
         const duration = ev.duration ?? 60;
-        const minutesSinceMidnight = start.getUTCHours() * 60 + start.getUTCMinutes();
+        const minutesSinceMidnight = start.getHours() * 60 + start.getMinutes();
 
         const top = minutesSinceMidnight * PIXELS_PER_MINUTE;
         const height = Math.max(duration * PIXELS_PER_MINUTE, 40);
@@ -316,7 +314,7 @@ export default function DayView({
                             </div>
 
                             <div className="text-xs text-[#5f6368] truncate min-w-0">
-                              {format12(start, true)} – {format12(end, true)}
+                              {format12(start)} – {format12(end)}
                             </div>
 
                             <div className="text-[11px] text-[#5f6368] truncate min-w-0">

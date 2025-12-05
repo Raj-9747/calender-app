@@ -70,8 +70,6 @@ const formatDateWithWeekday = (date: Date) =>
     day: "numeric",
   });
 
-const DISPLAY_TIMEZONE = "UTC";
-
 const formatTimeRange = (event: CalendarEvent) => {
   const startIso = event.startTime ?? event.bookingTime;
   if (!startIso) return null;
@@ -86,7 +84,6 @@ const formatTimeRange = (event: CalendarEvent) => {
     date.toLocaleTimeString([], {
       hour: "numeric",
       minute: "2-digit",
-      timeZone: DISPLAY_TIMEZONE,
     });
 
   return `${fmt(start)} – ${fmt(end)}`;
