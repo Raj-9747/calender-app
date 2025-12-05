@@ -144,7 +144,7 @@ const CalendarGrid = ({
       <div className="overflow-x-auto">
         <div className="min-w-full">
           {/* Days of Week Header */}
-          <div className="grid grid-cols-7 border-b border-[#e0e3eb] text-[11px] font-semibold uppercase tracking-wide text-[#5f6368] sm:text-xs">
+          <div className="sticky top-0 z-20 grid grid-cols-7 border-b border-[#e0e3eb] bg-[#f6f8fc] text-[11px] font-semibold uppercase tracking-wide text-[#5f6368] shadow-sm sm:text-xs">
             {daysOfWeek.map((day) => (
               <div key={day} className="px-2 py-3 text-right sm:px-4">
                 {day}

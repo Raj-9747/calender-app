@@ -7,16 +7,17 @@ interface CalendarHeaderProps {
   onPrevMonth: () => void;
   onNextMonth: () => void;
   onToday: () => void;
+  viewMode?: "day" | "week" | "month";
+  onChangeViewMode?: (mode: "day" | "week" | "month") => void;
 }
 
-const CalendarHeader = ({ currentDate, onPrevMonth, onNextMonth, onToday }: CalendarHeaderProps) => {
+const CalendarHeader = ({ currentDate, onPrevMonth, onNextMonth, onToday, viewMode, onChangeViewMode }: CalendarHeaderProps) => {
   const monthNames = [
     "January", "February", "March", "April", "May", "June",
     "July", "August", "September", "October", "November", "December"
   ];
 
   const monthYear = `${monthNames[currentDate.getMonth()]} ${currentDate.getFullYear()}`;
-  const viewOptions = ["Day", "Week", "Month", "Year"];
   const [selectedView, setSelectedView] = useState("Month");
 
   return (
@@ -57,22 +58,25 @@ const CalendarHeader = ({ currentDate, onPrevMonth, onNextMonth, onToday }: Cale
           </h1>
         </div>
 
-        {/* <div className="flex items-center gap-2 rounded-full border border-[#d2d6e3] bg-white p-1">
-          {viewOptions.map((option) => (
+        <div className="flex items-center gap-2 rounded-full border border-[#d2d6e3] bg-white p-1">
+          {["Day", "Week", "Month"].map((option) => (
             <button
               key={option}
               type="button"
               className={`rounded-full px-4 py-1 text-sm font-medium transition ${
-                selectedView === option
+                (viewMode ?? selectedView) === option
                   ? "bg-[#e8f0fe] text-[#1a73e8]"
                   : "text-[#5f6368] hover:bg-[#f1f3f4]"
               }`}
-              onClick={() => setSelectedView(option)}
+              onClick={() => {
+                setSelectedView(option);
+                onChangeViewMode?.(option.toLowerCase() as "day" | "week" | "month");
+              }}
             >
               {option}
             </button>
           ))}
-        </div> */}
+        </div>
       </div>
 
       <div className="text-sm text-[#5f6368]">

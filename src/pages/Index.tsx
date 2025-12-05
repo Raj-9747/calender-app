@@ -4,6 +4,7 @@ import { Menu, CircleUserRound, LogOut, Calendar as CalendarIcon, X, Trash2 } fr
 import CalendarHeader from "@/components/CalendarHeader";
 import CalendarGrid from "@/components/CalendarGrid";
 import DayView from "@/components/DayView";
+import WeekView from "@/components/WeekView";
 import UpcomingEventsView from "@/components/UpcomingEventsView";
 import EventDetailsModal from "@/components/EventDetailsModal";
 import { supabase } from "@/lib/supabaseClient";
@@ -134,18 +135,14 @@ const normalizeEvents = (rows: SupabaseBookingRow[]): CalendarEvent[] =>
 
 const normalizeRecurringTasks = (rows: RecurringTask[]): CalendarEvent[] =>
   rows.map((row) => {
-    // Do NOT apply DISPLAY_TIME_OFFSET_MS for recurring tasks.
-    // Keep the times as they are in the DB and display them as-is in the UI.
     const dateStr = row.event_date; // YYYY-MM-DD
+    // Treat DB times as UTC then apply the same display offset used for bookings
+    const startUtc = new Date(`${dateStr}T${row.start_time}Z`);
+    const endUtc = new Date(`${dateStr}T${row.end_time}Z`);
+    const adjustedStart = new Date(startUtc.getTime() - DISPLAY_TIME_OFFSET_MS);
+    const adjustedEnd = new Date(endUtc.getTime() - DISPLAY_TIME_OFFSET_MS);
 
-    // Use local-time style ISO (no trailing Z) so Date parsing treats it as local when rendering.
-    const startLocalStr = `${dateStr}T${row.start_time}`;
-    const endLocalStr = `${dateStr}T${row.end_time}`;
-
-    const start = new Date(startLocalStr);
-    const end = new Date(endLocalStr);
-
-    const duration = Math.round((end.getTime() - start.getTime()) / 60000);
+    const duration = Math.round((endUtc.getTime() - startUtc.getTime()) / 60000);
 
     const recurringDays = row.selected_days
       ? row.selected_days.split(",").map((d) => d.trim()).filter((d) => d.length > 0)
@@ -155,16 +152,14 @@ const normalizeRecurringTasks = (rows: RecurringTask[]): CalendarEvent[] =>
       id: `recurring-${row.id}`,
       title: row.event_title ?? "Untitled Task",
       description: "",
-      // Keep the original date from the DB
       date: dateStr,
       meetingLink: "",
       teamMember: row.team_member,
       duration: duration > 0 ? duration : 60,
-      // Store local-style timestamps (no Z). UI will render these as-is in 12-hour format.
-      startTime: startLocalStr,
-      endTime: endLocalStr,
-      bookingTime: startLocalStr,
-      originalBookingTime: startLocalStr,
+      startTime: adjustedStart.toISOString(),
+      endTime: adjustedEnd.toISOString(),
+      bookingTime: adjustedStart.toISOString(),
+      originalBookingTime: startUtc.toISOString(),
       customerName: null,
       customerEmail: null,
       phoneNumber: null,
@@ -176,7 +171,7 @@ const normalizeRecurringTasks = (rows: RecurringTask[]): CalendarEvent[] =>
     };
   });
 
-type ViewMode = "month" | "day" | "upcoming";
+type ViewMode = "month" | "week" | "day" | "upcoming";
 const defaultTeamMembers = ["Gauri", "Merilo", "Monica", "Shafoli", "Farahnaz" ];
 
 const Index = () => {
@@ -630,6 +625,33 @@ const Index = () => {
     setCurrentDate(new Date(today.getFullYear(), today.getMonth(), today.getDate()));
   };
 
+  const startOfWeek = (date: Date) => {
+    const copy = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    const day = copy.getDay(); // 0=Sun
+    const diff = (day + 6) % 7; // Monday start
+    copy.setDate(copy.getDate() - diff);
+    return copy;
+  };
+
+  const handlePrevWeek = () => {
+    const sow = startOfWeek(currentDate);
+    const prev = new Date(sow);
+    prev.setDate(prev.getDate() - 7);
+    setCurrentDate(prev);
+  };
+
+  const handleNextWeek = () => {
+    const sow = startOfWeek(currentDate);
+    const next = new Date(sow);
+    next.setDate(next.getDate() + 7);
+    setCurrentDate(next);
+  };
+
+  const handleTodayWeek = () => {
+    const today = new Date();
+    setCurrentDate(new Date(today.getFullYear(), today.getMonth(), today.getDate()));
+  };
+
   const openAppointmentModal = (date?: Date) => {
     const effectiveDate = date ?? currentDate;
     setSelectedDate(effectiveDate);
@@ -992,6 +1014,8 @@ const Index = () => {
                     onPrevMonth={handlePrevMonth}
                     onNextMonth={handleNextMonth}
                     onToday={handleToday}
+                    viewMode={viewMode}
+                    onChangeViewMode={(m) => setViewMode(m)}
                   />
                 </div>
                 <div className="flex-1 overflow-y-auto px-4 pb-6 sm:px-6 lg:px-10">
@@ -1065,6 +1089,34 @@ const Index = () => {
                   <DayView
                     date={dayViewDate}
                     events={[...dayViewEvents, ...recurringTaskEvents.filter((e) => e.date === formatDate(dayViewDate))]}
+                    onEventClick={showEventDetails}
+                    onDeleteEvent={handleDeleteEvent}
+                    teamMemberColors={teamMemberColors}
+                    isAdmin={isAdmin}
+                    deletingEventId={deletingEventId}
+                  />
+                </div>
+              </div>
+            )}
+
+            {viewMode === "week" && (
+              <div className="flex-1 flex flex-col">
+                <div className="flex items-center justify-between px-6 py-4 border-b border-[#e0e3eb] bg-white">
+                  <div className="flex items-center gap-2">
+                    <Button variant="ghost" size="sm" onClick={() => setViewMode("month")} className="text-[#5f6368] hover:text-[#202124]">
+                      Back to Month View
+                    </Button>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button variant="outline" size="sm" onClick={handlePrevWeek}>Previous Week</Button>
+                    <Button variant="outline" size="sm" onClick={() => { setViewMode("week"); handleTodayWeek(); }}>Today</Button>
+                    <Button variant="outline" size="sm" onClick={handleNextWeek}>Next Week</Button>
+                  </div>
+                </div>
+                <div className="flex-1 overflow-hidden flex flex-col min-h-0">
+                  <WeekView
+                    startOfWeek={startOfWeek(currentDate)}
+                    events={[...events, ...recurringTaskEvents]}
                     onEventClick={showEventDetails}
                     onDeleteEvent={handleDeleteEvent}
                     teamMemberColors={teamMemberColors}
