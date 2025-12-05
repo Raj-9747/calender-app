@@ -82,11 +82,12 @@ const CalendarSidebar = ({
         ? new Date(start.getTime() + event.duration * 60000)
         : null;
 
+    const useUTC = event.source !== "recurring_task";
     const fmt = (date: Date) =>
       date.toLocaleTimeString([], {
         hour: "numeric",
         minute: "2-digit",
-        timeZone: DISPLAY_TIMEZONE,
+        timeZone: useUTC ? DISPLAY_TIMEZONE : undefined,
       });
 
     if (!end) return fmt(start);

@@ -25,12 +25,12 @@ const PIXELS_PER_MINUTE = 3;
 const HOUR_HEIGHT = 60 * PIXELS_PER_MINUTE;      // 180px
 const TOTAL_HEIGHT = 24 * 60 * PIXELS_PER_MINUTE; // 4320px
 
-const format12 = (date: Date): string =>
+const format12 = (date: Date, useUTC = true): string =>
   date.toLocaleTimeString("en-US", {
     hour: "numeric",
     minute: "2-digit",
     hour12: true,
-    timeZone: DISPLAY_TIMEZONE,
+    timeZone: useUTC ? DISPLAY_TIMEZONE : undefined,
   });
 
 const getEventColor = (
@@ -96,16 +96,21 @@ export default function DayView({
 
   const positionedEvents = useMemo(() => {
     const base = events
-      .map((ev) => {
+        .map((ev) => {
         if (!ev.bookingTime) return null;
 
         const start = new Date(ev.bookingTime);
         const duration = ev.duration ?? 60;
-        const minutesSinceMidnight = start.getUTCHours() * 60 + start.getUTCMinutes();
+
+        // Bookings have already been adjusted elsewhere; recurring tasks should be treated as-is.
+        const minutesSinceMidnight = ev.source === "recurring_task"
+          ? start.getHours() * 60 + start.getMinutes()
+          : start.getUTCHours() * 60 + start.getUTCMinutes();
+
         const top = minutesSinceMidnight * PIXELS_PER_MINUTE;
         const height = Math.max(duration * PIXELS_PER_MINUTE, 40);
         const end = new Date(start.getTime() + duration * 60000);
-        const hour = start.getUTCHours();
+        const hour = ev.source === "recurring_task" ? start.getHours() : start.getUTCHours();
         return { ev, start, end, top, height, hour };
       })
       .filter(Boolean) as {
@@ -300,7 +305,7 @@ export default function DayView({
                             </div>
 
                             <div className="text-xs text-[#5f6368]">
-                              {format12(start)} – {format12(end)}
+                              {format12(start, ev.source !== "recurring_task")} – {format12(end, ev.source !== "recurring_task")}
                             </div>
 
                             <div className="text-[11px] text-[#5f6368]">

@@ -134,35 +134,37 @@ const normalizeEvents = (rows: SupabaseBookingRow[]): CalendarEvent[] =>
 
 const normalizeRecurringTasks = (rows: RecurringTask[]): CalendarEvent[] =>
   rows.map((row) => {
-    const dateStr = row.event_date;
-    const startUtc = new Date(`${dateStr}T${row.start_time}Z`);
-    const endUtc = new Date(`${dateStr}T${row.end_time}Z`);
-    const adjustedStart = new Date(startUtc.getTime() - DISPLAY_TIME_OFFSET_MS);
-    const adjustedEnd = new Date(endUtc.getTime() - DISPLAY_TIME_OFFSET_MS);
+    // Do NOT apply DISPLAY_TIME_OFFSET_MS for recurring tasks.
+    // Keep the times as they are in the DB and display them as-is in the UI.
+    const dateStr = row.event_date; // YYYY-MM-DD
 
-    const duration = Math.round((endUtc.getTime() - startUtc.getTime()) / 60000);
+    // Use local-time style ISO (no trailing Z) so Date parsing treats it as local when rendering.
+    const startLocalStr = `${dateStr}T${row.start_time}`;
+    const endLocalStr = `${dateStr}T${row.end_time}`;
 
-    const year = adjustedStart.getFullYear();
-    const month = String(adjustedStart.getMonth() + 1).padStart(2, "0");
-    const day = String(adjustedStart.getDate()).padStart(2, "0");
-    const shiftedDateStr = `${year}-${month}-${day}`;
+    const start = new Date(startLocalStr);
+    const end = new Date(endLocalStr);
+
+    const duration = Math.round((end.getTime() - start.getTime()) / 60000);
 
     const recurringDays = row.selected_days
-      ? row.selected_days.split(",").map((day) => day.trim()).filter((day) => day.length > 0)
+      ? row.selected_days.split(",").map((d) => d.trim()).filter((d) => d.length > 0)
       : [];
 
     return {
       id: `recurring-${row.id}`,
       title: row.event_title ?? "Untitled Task",
       description: "",
-      date: shiftedDateStr,
+      // Keep the original date from the DB
+      date: dateStr,
       meetingLink: "",
       teamMember: row.team_member,
       duration: duration > 0 ? duration : 60,
-      startTime: adjustedStart.toISOString(),
-      endTime: adjustedEnd.toISOString(),
-      bookingTime: adjustedStart.toISOString(),
-      originalBookingTime: startUtc.toISOString(),
+      // Store local-style timestamps (no Z). UI will render these as-is in 12-hour format.
+      startTime: startLocalStr,
+      endTime: endLocalStr,
+      bookingTime: startLocalStr,
+      originalBookingTime: startLocalStr,
       customerName: null,
       customerEmail: null,
       phoneNumber: null,

@@ -34,14 +34,14 @@ const EventDetailsModal = ({ isOpen, event, onClose, onDeleteEvent, teamMemberCo
   };
 
   // Convert 24-hour time to 12-hour format for display
-  const formatTime12Hour = (isoString?: string): string => {
+  const formatTime12Hour = (isoString?: string, useUTC = true): string => {
     if (!isoString) return "N/A";
     const date = new Date(isoString);
     return date.toLocaleTimeString("en-US", {
       hour: "numeric",
       minute: "2-digit",
       hour12: true,
-      timeZone: DISPLAY_TIMEZONE,
+      timeZone: useUTC ? DISPLAY_TIMEZONE : undefined,
     });
   };
 
@@ -56,8 +56,8 @@ const EventDetailsModal = ({ isOpen, event, onClose, onDeleteEvent, teamMemberCo
   };
 
   // Format times in 12-hour format for display
-  const startTime = event.startTime ? formatTime12Hour(event.startTime) : null;
-  const endTime = event.endTime ? formatTime12Hour(event.endTime) : null;
+  const startTime = event.startTime ? formatTime12Hour(event.startTime, event.source !== "recurring_task") : null;
+  const endTime = event.endTime ? formatTime12Hour(event.endTime, event.source !== "recurring_task") : null;
   const duration = event.duration ?? null;
 
   const displayTitle = getEventDisplayTitle(event);

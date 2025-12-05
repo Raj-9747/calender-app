@@ -82,11 +82,12 @@ const formatTimeRange = (event: CalendarEvent) => {
     ? new Date(event.endTime)
     : new Date(start.getTime() + duration * 60000);
 
+  const useUTC = event.source !== "recurring_task";
   const fmt = (date: Date) =>
     date.toLocaleTimeString([], {
       hour: "numeric",
       minute: "2-digit",
-      timeZone: DISPLAY_TIMEZONE,
+      timeZone: useUTC ? DISPLAY_TIMEZONE : undefined,
     });
 
   return `${fmt(start)} – ${fmt(end)}`;
