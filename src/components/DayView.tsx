@@ -117,6 +117,8 @@ export default function DayView({
       ev: CalendarEvent;
       start: Date;
       end: Date;
+      adjustedStart: Date;
+      adjustedEnd: Date;
       top: number;
       height: number;
     }[];
@@ -149,6 +151,8 @@ export default function DayView({
       ev: CalendarEvent;
       start: Date;
       end: Date;
+      adjustedStart: Date;
+      adjustedEnd: Date;
       top: number;
       height: number;
       columnIndex: number;
@@ -183,6 +187,8 @@ export default function DayView({
           ev: item.ev,
           start: item.start,
           end: item.end,
+          adjustedStart: item.adjustedStart,
+          adjustedEnd: item.adjustedEnd,
           top: item.top,
           height: item.height,
           columnIndex: assignments[idx],
