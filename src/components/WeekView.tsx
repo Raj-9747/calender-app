@@ -20,6 +20,8 @@ interface WeekViewProps {
 
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
 const DAYS = Array.from({ length: 7 }, (_, i) => i);
+const UI_OFFSET_MINUTES = 330;
+const UI_OFFSET_MS = UI_OFFSET_MINUTES * 60 * 1000;
 
 const PIXELS_PER_MINUTE = 3;
 const HOUR_HEIGHT = 60 * PIXELS_PER_MINUTE;      // 180px
@@ -98,10 +100,11 @@ export default function WeekView({
           if (!startIso) return null;
           const start = new Date(startIso);
           const duration = ev.duration ?? 60;
-          const minutesSinceMidnight = start.getHours() * 60 + start.getMinutes();
+          const end = new Date(start.getTime() + duration * 60000);
+          const adjustedStart = new Date(start.getTime() - UI_OFFSET_MS);
+          const minutesSinceMidnight = adjustedStart.getHours() * 60 + adjustedStart.getMinutes();
           const top = minutesSinceMidnight * PIXELS_PER_MINUTE;
           const height = Math.max(duration * PIXELS_PER_MINUTE, 40);
-          const end = new Date(start.getTime() + duration * 60000);
           return { ev, start, end, top, height };
         })
         .filter(Boolean) as {
@@ -277,7 +280,7 @@ export default function WeekView({
                                 )}
                               </div>
                               <div className={`${isCompact ? "text-[11px] text-[#202124]" : "text-xs text-[#5f6368]"} truncate min-w-0`}>
-                                {format12(start)}
+                                {format12(new Date(start.getTime() - UI_OFFSET_MS))}
                               </div>
                               {!isCompact && (
                                 <div className="text-[11px] text-[#5f6368] truncate min-w-0">
