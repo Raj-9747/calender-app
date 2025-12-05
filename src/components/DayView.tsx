@@ -225,7 +225,7 @@ export default function DayView({
           <tbody>
             <tr>
               {/* HOURS COLUMN */}
-              <td className="align-top bg-[#f6f8fc] border-r border-[#e0e3eb]">
+              <td className="align-top bg-[#f6f8fc] border-r border-[#e0e3eb] p-0">
                 <div className="flex flex-col">
                   {HOURS.map((h) => (
                     <div

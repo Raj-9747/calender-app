@@ -26,6 +26,7 @@ const UI_OFFSET_MS = UI_OFFSET_MINUTES * 60 * 1000;
 const PIXELS_PER_MINUTE = 3;
 const HOUR_HEIGHT = 60 * PIXELS_PER_MINUTE;      // 180px
 const TOTAL_HEIGHT = 24 * 60 * PIXELS_PER_MINUTE; // 4320px
+const HEADER_ROW_HEIGHT = 36;
 
 const format12 = (date: Date): string =>
   date.toLocaleTimeString("en-US", {
@@ -211,8 +212,9 @@ export default function WeekView({
           <tbody>
             <tr>
               {/* hours column */}
-              <td className="align-top bg-[#f6f8fc] border-r border-[#e0e3eb]">
+              <td className="align-top bg-[#f6f8fc] border-r border-[#e0e3eb] p-0">
                 <div className="flex flex-col">
+                  <div className="sticky top-0 z-20 px-3 text-xs text-[#5f6368] border-b border-[#e0e3eb] bg-[#f6f8fc] shadow-sm" style={{ height: `${HEADER_ROW_HEIGHT}px` }} />
                   {HOURS.map((h) => (
                     <div key={h} className="border-b border-[#e0e3eb] px-3 py-2 text-xs text-[#5f6368]" style={{ height: `${HOUR_HEIGHT}px` }}>
                       {h === 0 ? "12 AM" : h < 12 ? `${h} AM` : h === 12 ? "12 PM" : `${h - 12} PM`}
@@ -227,7 +229,7 @@ export default function WeekView({
                 const header = day.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
                 return (
                   <td key={dayIdx} className="align-top p-0 relative border-r border-[#e0e3eb]">
-                    <div className="sticky top-0 z-20 px-3 py-2 text-xs text-[#5f6368] border-b border-[#e0e3eb] bg-[#f6f8fc] shadow-sm">{header}</div>
+                    <div className="sticky top-0 z-20 px-3 text-xs text-[#5f6368] border-b border-[#e0e3eb] bg-[#f6f8fc] shadow-sm" style={{ height: `${HEADER_ROW_HEIGHT}px`, lineHeight: `${HEADER_ROW_HEIGHT - 6}px` }}>{header}</div>
                     <div className="relative w-full" style={{ height: `${TOTAL_HEIGHT}px` }}>
                       {HOURS.map((h) => (
                         <div key={h} className="absolute left-0 right-0 border-b border-[#e0e3eb]" style={{ top: `${h * HOUR_HEIGHT}px`, height: `${HOUR_HEIGHT}px` }} />
