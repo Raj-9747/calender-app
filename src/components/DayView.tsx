@@ -96,22 +96,17 @@ export default function DayView({
 
   const positionedEvents = useMemo(() => {
     const base = events
-        .map((ev) => {
+      .map((ev) => {
         if (!ev.bookingTime) return null;
 
         const start = new Date(ev.bookingTime);
         const duration = ev.duration ?? 60;
-
-        // Bookings have already been adjusted elsewhere; recurring tasks should be treated as-is.
-        const minutesSinceMidnight = ev.source === "recurring_task"
-          ? start.getHours() * 60 + start.getMinutes()
-          : start.getUTCHours() * 60 + start.getUTCMinutes();
+        const minutesSinceMidnight = start.getUTCHours() * 60 + start.getUTCMinutes();
 
         const top = minutesSinceMidnight * PIXELS_PER_MINUTE;
         const height = Math.max(duration * PIXELS_PER_MINUTE, 40);
         const end = new Date(start.getTime() + duration * 60000);
-        const hour = ev.source === "recurring_task" ? start.getHours() : start.getUTCHours();
-        return { ev, start, end, top, height, hour };
+        return { ev, start, end, top, height };
       })
       .filter(Boolean) as {
       ev: CalendarEvent;
@@ -119,14 +114,31 @@ export default function DayView({
       end: Date;
       top: number;
       height: number;
-      hour: number;
     }[];
 
-    const byHour: Record<number, typeof base> = {};
-    base.forEach((item) => {
-      byHour[item.hour] ??= [];
-      byHour[item.hour].push(item);
-    });
+    if (base.length === 0) return [];
+
+    const overlaps = (a: typeof base[number], b: typeof base[number]) => a.start < b.end && b.start < a.end;
+    const visited = new Array(base.length).fill(false);
+    const groups: number[][] = [];
+
+    for (let i = 0; i < base.length; i++) {
+      if (visited[i]) continue;
+      const queue = [i];
+      visited[i] = true;
+      const component: number[] = [];
+      while (queue.length) {
+        const idx = queue.shift()!;
+        component.push(idx);
+        for (let j = 0; j < base.length; j++) {
+          if (!visited[j] && overlaps(base[idx], base[j])) {
+            visited[j] = true;
+            queue.push(j);
+          }
+        }
+      }
+      groups.push(component);
+    }
 
     const laidOut: Array<{
       ev: CalendarEvent;
@@ -138,10 +150,10 @@ export default function DayView({
       totalColumns: number;
     }> = [];
 
-    Object.keys(byHour).forEach((key) => {
-      const group = byHour[Number(key)].sort((a, b) => a.start.getTime() - b.start.getTime());
+    groups.forEach((indices) => {
+      const group = indices.map((i) => base[i]).sort((a, b) => a.start.getTime() - b.start.getTime());
       const columnsEnd: number[] = [];
-      const assigned: Array<number> = [];
+      const assignments: number[] = [];
 
       group.forEach((item, idx) => {
         let placedAt = -1;
@@ -157,7 +169,7 @@ export default function DayView({
         } else {
           columnsEnd[placedAt] = item.end.getTime();
         }
-        assigned[idx] = placedAt;
+        assignments[idx] = placedAt;
       });
 
       const total = Math.max(columnsEnd.length, 1);
@@ -168,13 +180,12 @@ export default function DayView({
           end: item.end,
           top: item.top,
           height: item.height,
-          columnIndex: assigned[idx],
+          columnIndex: assignments[idx],
           totalColumns: total,
         });
       });
     });
 
-    // keep overall order stable
     return laidOut.sort((a, b) => a.top - b.top || a.columnIndex - b.columnIndex);
   }, [events]);
 
@@ -262,7 +273,7 @@ export default function DayView({
                       return (
                         <div
                           key={ev.id}
-                          className={`absolute rounded-md shadow-sm border-l-4 cursor-pointer hover:shadow-md ${
+                          className={`absolute rounded-md shadow-sm border-l-4 cursor-pointer hover:shadow-md box-border overflow-hidden ${
                             deletingEventId === ev.id ? "opacity-50 pointer-events-none" : ""
                           } ${isRecurringTask ? "border-l-8" : ""}`}
                           style={{
@@ -278,9 +289,9 @@ export default function DayView({
                           onClick={() => onEventClick(ev)}
                           title={`${displayTitle}\n${isRecurringTask ? ev.title : `Email: ${emailLabel}`}`}
                         >
-                          <div className="p-2 flex flex-col h-full gap-1">
+                          <div className="p-2 flex flex-col h-full min-h-0 gap-1">
                             <div className="flex items-start justify-between gap-2">
-                              <div className="text-xs font-semibold line-clamp-2 flex-1 flex items-start gap-1">
+                              <div className="text-xs font-semibold truncate flex-1 min-w-0 flex items-start gap-1">
                                 {isRecurringTask && <span className="font-bold text-base leading-none">📌</span>}
                                 <span>{displayTitle}</span>
                               </div>
@@ -304,11 +315,11 @@ export default function DayView({
                               </button>
                             </div>
 
-                            <div className="text-xs text-[#5f6368]">
-                              {format12(start, ev.source !== "recurring_task")} – {format12(end, ev.source !== "recurring_task")}
+                            <div className="text-xs text-[#5f6368] truncate min-w-0">
+                              {format12(start, true)} – {format12(end, true)}
                             </div>
 
-                            <div className="text-[11px] text-[#5f6368]">
+                            <div className="text-[11px] text-[#5f6368] truncate min-w-0">
                               {isRecurringTask ? (
                                 <span className="font-medium">{ev.title}</span>
                               ) : (
