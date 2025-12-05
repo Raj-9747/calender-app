@@ -279,8 +279,14 @@ export default function DayView({
                       const emailLabel = getCustomerEmailDisplay(ev);
                       const isRecurringTask = ev.source === "recurring_task";
                       const displayTitle = isRecurringTask ? ev.title : getEventDisplayTitle(ev);
-                      const widthPercent = 100 / totalColumns;
-                      const leftPercent = columnIndex * widthPercent;
+                      const localSet = positionedEvents.filter(
+                        (p) => p !== undefined && p.adjustedStart < adjustedEnd && adjustedStart < p.adjustedEnd
+                      );
+                      const localColumnIndices = Array.from(new Set([...localSet.map((p) => p.columnIndex), columnIndex])).sort((a, b) => a - b);
+                      const localTotal = Math.max(localColumnIndices.length, 1);
+                      const widthPercent = 100 / localTotal;
+                      const localIndex = Math.max(localColumnIndices.indexOf(columnIndex), 0);
+                      const leftPercent = localIndex * widthPercent;
                       return (
                         <div
                           key={ev.id}

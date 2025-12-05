@@ -85,6 +85,8 @@ export default function WeekView({
       ev: CalendarEvent;
       start: Date;
       end: Date;
+      adjustedStart: Date;
+      adjustedEnd: Date;
       top: number;
       height: number;
       columnIndex: number;
@@ -104,15 +106,18 @@ export default function WeekView({
           const isRecurringTask = ev.source === "recurring_task";
           const offsetMs = isRecurringTask ? 0 : UI_OFFSET_MS;
           const adjustedStart = new Date(start.getTime() - offsetMs);
+          const adjustedEnd = new Date(end.getTime() - offsetMs);
           const minutesSinceMidnight = adjustedStart.getHours() * 60 + adjustedStart.getMinutes();
           const top = minutesSinceMidnight * PIXELS_PER_MINUTE;
           const height = Math.max(duration * PIXELS_PER_MINUTE, 40);
-          return { ev, start, end, top, height };
+          return { ev, start, end, adjustedStart, adjustedEnd, top, height };
         })
         .filter(Boolean) as {
           ev: CalendarEvent;
           start: Date;
           end: Date;
+          adjustedStart: Date;
+          adjustedEnd: Date;
           top: number;
           height: number;
         }[];
@@ -143,6 +148,8 @@ export default function WeekView({
         ev: CalendarEvent;
         start: Date;
         end: Date;
+        adjustedStart: Date;
+        adjustedEnd: Date;
         top: number;
         height: number;
         columnIndex: number;
@@ -175,6 +182,8 @@ export default function WeekView({
             ev: item.ev,
             start: item.start,
             end: item.end,
+            adjustedStart: item.adjustedStart,
+            adjustedEnd: item.adjustedEnd,
             top: item.top,
             height: item.height,
             columnIndex: assignments[idx],
@@ -223,13 +232,17 @@ export default function WeekView({
                       {HOURS.map((h) => (
                         <div key={h} className="absolute left-0 right-0 border-b border-[#e0e3eb]" style={{ top: `${h * HOUR_HEIGHT}px`, height: `${HOUR_HEIGHT}px` }} />
                       ))}
-                      {positioned.map(({ ev, start, end, top, height, columnIndex, totalColumns }) => {
+                      {positioned.map(({ ev, start, end, adjustedStart, adjustedEnd, top, height, columnIndex, totalColumns }) => {
                         const color = getEventColor(ev, teamMemberColors);
                         const emailLabel = getCustomerEmailDisplay(ev);
                         const isRecurringTask = ev.source === "recurring_task";
                         const displayTitle = isRecurringTask ? ev.title : getEventDisplayTitle(ev);
-                        const widthPercent = 100 / totalColumns;
-                        const leftPercent = columnIndex * widthPercent;
+                        const localSet = positioned.filter((p) => p.adjustedStart < adjustedEnd && adjustedStart < p.adjustedEnd);
+                        const localColumnIndices = Array.from(new Set([...localSet.map((p) => p.columnIndex), columnIndex])).sort((a, b) => a - b);
+                        const localTotal = Math.max(localColumnIndices.length, 1);
+                        const widthPercent = 100 / localTotal;
+                        const localIndex = Math.max(localColumnIndices.indexOf(columnIndex), 0);
+                        const leftPercent = localIndex * widthPercent;
                         const titleSizing = totalColumns >= 3 ? "text-[11px] leading-tight" : "text-xs";
                         const isCompact = totalColumns >= 2;
                         const gutterPx = 4;
