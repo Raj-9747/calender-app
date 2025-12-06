@@ -12,7 +12,7 @@ import CalendarSidebar from "@/components/CalendarSidebar";
 import AppointmentScheduleModal from "@/components/AppointmentScheduleModal";
 import DeleteEventModal from "@/components/DeleteEventModal";
 import { toast } from "sonner";
-import { getColorForTitle } from "@/lib/utils";
+import { getColorForTitle, getBrowserTimeZone } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -81,8 +81,6 @@ type SupabaseBookingRow = {
   isActive: boolean | null;
 };
 
-const DISPLAY_TIME_OFFSET_MINUTES = 300; // 5 hours
-const DISPLAY_TIME_OFFSET_MS = DISPLAY_TIME_OFFSET_MINUTES * 60 * 1000;
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
 
 const shiftBookingTime = (isoString?: string): Date | null => {
@@ -94,11 +92,9 @@ const shiftBookingTime = (isoString?: string): Date | null => {
 
 const normalizeEvents = (rows: SupabaseBookingRow[]): CalendarEvent[] =>
   rows.map((row) => {
+    const tz = getBrowserTimeZone();
     const start = row.booking_time ? new Date(row.booking_time) : new Date();
-    const year = start.getFullYear();
-    const month = String(start.getMonth() + 1).padStart(2, "0");
-    const day = String(start.getDate()).padStart(2, "0");
-    const dateStr = `${year}-${month}-${day}`;
+    const dateStr = start.toLocaleDateString("en-CA", { timeZone: tz });
 
     const duration = row.duration ?? 60;
     const end = new Date(start.getTime() + duration * 60000);
@@ -127,13 +123,13 @@ const normalizeEvents = (rows: SupabaseBookingRow[]): CalendarEvent[] =>
 
 const normalizeRecurringTasks = (rows: RecurringTask[]): CalendarEvent[] =>
   rows.map((row) => {
-    const dateStr = row.event_date;
-    const startLocalStr = `${dateStr}T${row.start_time}`;
-    const endLocalStr = `${dateStr}T${row.end_time}`;
+    const tz = getBrowserTimeZone();
+    const baseDate = row.event_date;
+    const startUtc = new Date(`${baseDate}T${row.start_time}Z`);
+    const endUtc = new Date(`${baseDate}T${row.end_time}Z`);
+    const duration = Math.max(Math.round((endUtc.getTime() - startUtc.getTime()) / 60000), 1);
 
-    const start = new Date(startLocalStr);
-    const end = new Date(endLocalStr);
-    const duration = Math.round((end.getTime() - start.getTime()) / 60000);
+    const localDateStr = startUtc.toLocaleDateString("en-CA", { timeZone: tz });
 
     const recurringDays = row.selected_days
       ? row.selected_days.split(",").map((d) => d.trim()).filter((d) => d.length > 0)
@@ -143,14 +139,14 @@ const normalizeRecurringTasks = (rows: RecurringTask[]): CalendarEvent[] =>
       id: `recurring-${row.id}`,
       title: row.event_title ?? "Untitled Task",
       description: "",
-      date: dateStr,
+      date: localDateStr,
       meetingLink: "",
       teamMember: row.team_member,
-      duration: duration > 0 ? duration : 60,
-      startTime: startLocalStr,
-      endTime: endLocalStr,
-      bookingTime: startLocalStr,
-      originalBookingTime: startLocalStr,
+      duration,
+      startTime: startUtc.toISOString(),
+      endTime: endUtc.toISOString(),
+      bookingTime: startUtc.toISOString(),
+      originalBookingTime: startUtc.toISOString(),
       customerName: null,
       customerEmail: null,
       phoneNumber: null,
@@ -158,7 +154,7 @@ const normalizeRecurringTasks = (rows: RecurringTask[]): CalendarEvent[] =>
       typeOfMeeting: null,
       isActive: true,
       source: "recurring_task",
-      recurringDays: recurringDays,
+      recurringDays,
     };
   });
 
@@ -796,15 +792,7 @@ const Index = () => {
         return;
       }
 
-      const formatTimestamp = (date: Date) => {
-        const y = date.getFullYear();
-        const m = String(date.getMonth() + 1).padStart(2, "0");
-        const d = String(date.getDate()).padStart(2, "0");
-        const hh = String(date.getHours()).padStart(2, "0");
-        const mm = String(date.getMinutes()).padStart(2, "0");
-        const ss = "00";
-        return `${y}-${m}-${d}T${hh}:${mm}:${ss}`;
-      };
+      const utcIso = bookingDateTime.toISOString();
 
       const storedTeamMember = localStorage.getItem("team_member");
       if (!storedTeamMember) {
@@ -843,7 +831,7 @@ const Index = () => {
           .insert({
             product_name: serviceTypeValue || null,
             summary: values.description.trim() || null,
-            booking_time: formatTimestamp(bookingDateTime),
+            booking_time: utcIso,
             meet_link: sanitizedMeetingLink,
             team_member: normalizedTeamMember,
             duration: durationMinutes,
@@ -1225,6 +1213,7 @@ const Index = () => {
                   weekday: "long",
                   month: "short",
                   day: "numeric",
+                  timeZone: getBrowserTimeZone(),
                 })}
               </p>
               <h3 className="mt-2 text-2xl font-semibold text-[#202124]">
@@ -1239,11 +1228,12 @@ const Index = () => {
             ) : (
               <div className="space-y-4 pb-4">
                 {mobileSheetEvents.map((event) => {
+                  const tz = getBrowserTimeZone();
                   const startTime = event.startTime
-                    ? new Date(event.startTime).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })
+                    ? new Date(event.startTime).toLocaleTimeString([], { hour: "numeric", minute: "2-digit", timeZone: tz })
                     : "N/A";
                   const endTime = event.endTime
-                    ? new Date(event.endTime).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })
+                    ? new Date(event.endTime).toLocaleTimeString([], { hour: "numeric", minute: "2-digit", timeZone: tz })
                     : null;
                   const accent = getMobileEventAccent(event);
                   const isRecurringTask = event.source === "recurring_task";

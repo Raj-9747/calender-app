@@ -68,6 +68,7 @@ const formatDateWithWeekday = (date: Date) =>
     weekday: "short",
     month: "short",
     day: "numeric",
+    timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
   });
 
 const formatTimeRange = (event: CalendarEvent) => {
@@ -84,6 +85,7 @@ const formatTimeRange = (event: CalendarEvent) => {
     date.toLocaleTimeString([], {
       hour: "numeric",
       minute: "2-digit",
+      timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
     });
 
   return `${fmt(start)} – ${fmt(end)}`;

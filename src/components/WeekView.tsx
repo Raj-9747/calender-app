@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useEffect, useState } from "react";
 import { CalendarEvent } from "@/pages/Index";
 import { getColorForTitle } from "@/lib/utils";
 import { Trash2 } from "lucide-react";
@@ -20,8 +20,6 @@ interface WeekViewProps {
 
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
 const DAYS = Array.from({ length: 7 }, (_, i) => i);
-const UI_OFFSET_MINUTES = 330;
-const UI_OFFSET_MS = UI_OFFSET_MINUTES * 60 * 1000;
 
 const PIXELS_PER_MINUTE = 3;
 const HOUR_HEIGHT = 60 * PIXELS_PER_MINUTE;      // 180px
@@ -33,19 +31,26 @@ const format12 = (date: Date): string =>
     hour: "numeric",
     minute: "2-digit",
     hour12: true,
+    timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
   });
 
 const getEventColor = (
   event: CalendarEvent,
   colors?: Map<string, string>,
 ): string => {
-  if (event.teamMember && colors) {
-    const mapped = colors.get(event.teamMember);
-    if (mapped) return mapped;
-  }
   if (event.source === "recurring_task") {
     const titleColor = getColorForTitle(event.title);
     if (titleColor) return titleColor;
+    const recurringTaskColors = ["#ea4335", "#fbbc04", "#34a853", "#00897b", "#1565c0", "#6f42c1"];
+    if (event.teamMember) {
+      const colorIndex = event.teamMember.charCodeAt(0) % recurringTaskColors.length;
+      return recurringTaskColors[colorIndex];
+    }
+    return recurringTaskColors[0];
+  }
+  if (event.teamMember && colors) {
+    const mapped = colors.get(event.teamMember);
+    if (mapped) return mapped;
   }
   return "#1a73e8";
 };
@@ -55,6 +60,14 @@ const hexToRgba = (hex: string, opacity: number): string => {
   const g = parseInt(hex.slice(3, 5), 16);
   const b = parseInt(hex.slice(5, 7), 16);
   return `rgba(${r}, ${g}, ${b}, ${opacity})`;
+};
+
+const getTextColorForBg = (hex: string): string => {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  const yiq = (r * 299 + g * 587 + b * 114) / 1000;
+  return yiq >= 150 ? "#202124" : "#ffffff";
 };
 
 const formatDate = (date: Date): string => {
@@ -79,6 +92,14 @@ export default function WeekView({
   isAdmin,
   deletingEventId,
 }: WeekViewProps) {
+  const [vpWidth, setVpWidth] = useState(typeof window !== "undefined" ? window.innerWidth : 1024);
+  useEffect(() => {
+    const onResize = () => setVpWidth(window.innerWidth);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+  const isMobile = vpWidth < 640;
+  const isTablet = vpWidth >= 640 && vpWidth < 1024;
   const days = useMemo(() => DAYS.map((i) => addDays(startOfWeek, i)), [startOfWeek]);
 
   const positionedByDay = useMemo(() => {
@@ -86,8 +107,6 @@ export default function WeekView({
       ev: CalendarEvent;
       start: Date;
       end: Date;
-      adjustedStart: Date;
-      adjustedEnd: Date;
       top: number;
       height: number;
       columnIndex: number;
@@ -104,21 +123,15 @@ export default function WeekView({
           const start = new Date(startIso);
           const duration = ev.duration ?? 60;
           const end = new Date(start.getTime() + duration * 60000);
-          const isRecurringTask = ev.source === "recurring_task";
-          const offsetMs = isRecurringTask ? 0 : UI_OFFSET_MS;
-          const adjustedStart = new Date(start.getTime() - offsetMs);
-          const adjustedEnd = new Date(end.getTime() - offsetMs);
-          const minutesSinceMidnight = adjustedStart.getHours() * 60 + adjustedStart.getMinutes();
+          const minutesSinceMidnight = start.getHours() * 60 + start.getMinutes();
           const top = minutesSinceMidnight * PIXELS_PER_MINUTE;
           const height = Math.max(duration * PIXELS_PER_MINUTE, 40);
-          return { ev, start, end, adjustedStart, adjustedEnd, top, height };
+          return { ev, start, end, top, height };
         })
         .filter(Boolean) as {
           ev: CalendarEvent;
           start: Date;
           end: Date;
-          adjustedStart: Date;
-          adjustedEnd: Date;
           top: number;
           height: number;
         }[];
@@ -149,8 +162,6 @@ export default function WeekView({
         ev: CalendarEvent;
         start: Date;
         end: Date;
-        adjustedStart: Date;
-        adjustedEnd: Date;
         top: number;
         height: number;
         columnIndex: number;
@@ -183,8 +194,6 @@ export default function WeekView({
             ev: item.ev,
             start: item.start,
             end: item.end,
-            adjustedStart: item.adjustedStart,
-            adjustedEnd: item.adjustedEnd,
             top: item.top,
             height: item.height,
             columnIndex: assignments[idx],
@@ -226,28 +235,57 @@ export default function WeekView({
               {days.map((day, dayIdx) => {
                 const dateStr = formatDate(day);
                 const positioned = positionedByDay[dateStr] ?? [];
-                const header = day.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
+                const header = day.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric", timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone });
                 return (
                   <td key={dayIdx} className="align-top p-0 relative border-r border-[#e0e3eb]">
                     <div className="sticky top-0 z-20 px-3 text-xs text-[#5f6368] border-b border-[#e0e3eb] bg-[#f6f8fc] shadow-sm" style={{ height: `${HEADER_ROW_HEIGHT}px`, lineHeight: `${HEADER_ROW_HEIGHT - 6}px` }}>{header}</div>
-                    <div className="relative w-full" style={{ height: `${TOTAL_HEIGHT}px` }}>
+                    <div className={`relative w-full ${isTablet ? "overflow-x-auto" : ""}`} style={{ height: `${TOTAL_HEIGHT}px` }}>
                       {HOURS.map((h) => (
                         <div key={h} className="absolute left-0 right-0 border-b border-[#e0e3eb]" style={{ top: `${h * HOUR_HEIGHT}px`, height: `${HOUR_HEIGHT}px` }} />
                       ))}
-                      {positioned.map(({ ev, start, end, adjustedStart, adjustedEnd, top, height, columnIndex, totalColumns }) => {
+                      {positioned.map(({ ev, start, end, top, height, columnIndex, totalColumns }) => {
                         const color = getEventColor(ev, teamMemberColors);
                         const emailLabel = getCustomerEmailDisplay(ev);
                         const isRecurringTask = ev.source === "recurring_task";
                         const displayTitle = isRecurringTask ? ev.title : getEventDisplayTitle(ev);
-                        const localSet = positioned.filter((p) => p.adjustedStart < adjustedEnd && adjustedStart < p.adjustedEnd);
-                        const localColumnIndices = Array.from(new Set([...localSet.map((p) => p.columnIndex), columnIndex])).sort((a, b) => a - b);
-                        const localTotal = Math.max(localColumnIndices.length, 1);
-                        const widthPercent = 100 / localTotal;
-                        const localIndex = Math.max(localColumnIndices.indexOf(columnIndex), 0);
-                        const leftPercent = localIndex * widthPercent;
-                        const titleSizing = totalColumns >= 3 ? "text-[11px] leading-tight" : "text-xs";
-                        const isCompact = totalColumns >= 2;
+                        const localSet = positioned.filter((p) => p.start < end && start < p.end);
+                        const sortedLocal = localSet.slice().sort((a, b) => (
+                          a.start.getTime() - b.start.getTime()
+                        ) || ((a.ev.id || "").toString().localeCompare((b.ev.id || "").toString())));
+                        const localTotal = Math.max(sortedLocal.length, 1);
+                        let widthPercent = 100 / localTotal;
+                        let localIndex = Math.max(sortedLocal.findIndex((p) => p.ev.id === ev.id), 0);
+                        let leftPercent = localIndex * widthPercent;
+                        let topOffset = top;
                         const gutterPx = 4;
+                        let leftStyle: string;
+                        let widthStyle: string;
+                        if (isMobile) {
+                          widthPercent = 100;
+                          leftPercent = 0;
+                          topOffset = top + localIndex * 6;
+                          leftStyle = `calc(${leftPercent}% + ${gutterPx / 2}px)`;
+                          widthStyle = `calc(${widthPercent}% - ${gutterPx}px)`;
+                        } else if (isTablet) {
+                          if (localTotal > 3) {
+                            const colWidth = 150;
+                            const leftPx = localIndex * (colWidth + gutterPx);
+                            leftStyle = `${leftPx + gutterPx / 2}px`;
+                            widthStyle = `${colWidth}px`;
+                          } else {
+                            const cols = Math.min(localTotal, 3);
+                            widthPercent = 100 / cols;
+                            localIndex = Math.min(localIndex, cols - 1);
+                            leftPercent = localIndex * widthPercent;
+                            leftStyle = `calc(${leftPercent}% + ${gutterPx / 2}px)`;
+                            widthStyle = `calc(${widthPercent}% - ${gutterPx}px)`;
+                          }
+                        } else {
+                          leftStyle = `calc(${leftPercent}% + ${gutterPx / 2}px)`;
+                          widthStyle = `calc(${widthPercent}% - ${gutterPx}px)`;
+                        }
+                        const titleSizing = totalColumns >= 3 ? "text-[11px] leading-tight" : "text-xs";
+                        const isCompact = isMobile || totalColumns >= 2;
                         return (
                           <div
                             key={ev.id}
@@ -257,14 +295,16 @@ export default function WeekView({
                               deletingEventId === ev.id ? "opacity-50 pointer-events-none" : ""
                             } ${isCompact ? "border" : isRecurringTask ? "border-l-8" : "border-l-4"}`}
                             style={{
-                              top,
+                              top: topOffset,
                               height,
-                              left: `calc(${leftPercent}% + ${gutterPx / 2}px)`,
-                              width: `calc(${widthPercent}% - ${gutterPx}px)`,
-                              backgroundColor: isCompact ? hexToRgba(color, 0.15) : hexToRgba(color, isRecurringTask ? 0.15 : 0.1),
-                              borderColor: isCompact ? hexToRgba(color, 0.6) : hexToRgba(color, isRecurringTask ? 0.4 : 0.3),
+                              left: leftStyle,
+                              width: widthStyle,
+                              minWidth: isTablet ? 150 : 90,
+                              backgroundColor: isRecurringTask ? color : (isCompact ? hexToRgba(color, 0.15) : hexToRgba(color, 0.1)),
+                              borderColor: isRecurringTask ? color : (isCompact ? hexToRgba(color, 0.6) : hexToRgba(color, 0.3)),
                               borderLeftColor: isCompact ? undefined : color,
                               borderLeftWidth: isCompact ? undefined : isRecurringTask ? "8px" : "4px",
+                              color: isRecurringTask ? getTextColorForBg(color) : undefined,
                             }}
                             onClick={() => onEventClick(ev)}
                             title={`${displayTitle}\n${isRecurringTask ? ev.title : `Email: ${emailLabel}`}`}
@@ -272,7 +312,7 @@ export default function WeekView({
                             <div className={`${isCompact ? "p-1.5" : "p-2"} flex flex-col h-full min-h-0 gap-1`}>
                               <div className="flex items-start justify-between gap-2">
                                 <div className={`font-semibold flex-1 min-w-0 flex items-start gap-1 break-words ${isCompact ? "line-clamp-2" : "line-clamp-2"} ${titleSizing}`}>
-                                  {isRecurringTask && !isCompact && <span className="font-bold text-base leading-none">📌</span>}
+                                  {isRecurringTask && isMobile && <span className="text-[10px] px-1 py-0.5 rounded bg-[#f1f3f4] text-[#5f6368]">Recurring</span>}
                                   <span>{displayTitle}</span>
                                 </div>
                                 {!isCompact && (
@@ -296,11 +336,11 @@ export default function WeekView({
                                   </button>
                                 )}
                               </div>
-                              <div className={`${isCompact ? "text-[11px] text-[#202124]" : "text-xs text-[#5f6368]"} truncate min-w-0`}>
-                                {format12(isRecurringTask ? start : new Date(start.getTime() - UI_OFFSET_MS))}
+                              <div className={`${isCompact ? "text-[11px]" : "text-xs"} truncate min-w-0`} style={{ color: isRecurringTask ? getTextColorForBg(color) : (isCompact ? "#202124" : "#5f6368") }}>
+                                {format12(start)}
                               </div>
                               {!isCompact && (
-                                <div className="text-[11px] text-[#5f6368] truncate min-w-0">
+                                <div className="text-[11px] truncate min-w-0" style={{ color: isRecurringTask ? getTextColorForBg(color) : "#5f6368" }}>
                                   {isRecurringTask ? (
                                     <span className="font-medium">{ev.title}</span>
                                   ) : (
@@ -309,7 +349,7 @@ export default function WeekView({
                                 </div>
                               )}
                               {ev.teamMember && !isCompact && (
-                                <div className="text-[11px] text-[#5f6368]">{ev.teamMember}</div>
+                                <div className="text-[11px]" style={{ color: isRecurringTask ? getTextColorForBg(color) : "#5f6368" }}>{ev.teamMember}</div>
                               )}
                             </div>
                           </div>

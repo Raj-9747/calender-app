@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { CalendarEvent } from "@/pages/Index";
 import { getColorForTitle } from "@/lib/utils";
 import { Trash2 } from "lucide-react";
@@ -19,8 +19,6 @@ interface DayViewProps {
 }
 
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
-const UI_OFFSET_MINUTES = 330;
-const UI_OFFSET_MS = UI_OFFSET_MINUTES * 60 * 1000;
 
 const PIXELS_PER_MINUTE = 3;
 const HOUR_HEIGHT = 60 * PIXELS_PER_MINUTE;      // 180px
@@ -31,39 +29,27 @@ const format12 = (date: Date): string =>
     hour: "numeric",
     minute: "2-digit",
     hour12: true,
+    timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
   });
 
 const getEventColor = (
   event: CalendarEvent,
   colors?: Map<string, string>,
 ): string => {
-  // If we have an explicit color for the team member, prefer it (so recurring tasks match bookings)
-  if (event.teamMember && colors) {
-    const mapped = colors.get(event.teamMember);
-    if (mapped) return mapped;
-  }
-
-  // Fallback palette for recurring tasks
   if (event.source === "recurring_task") {
-    // First prefer title-based mapping (exact colors from screenshot)
     const titleColor = getColorForTitle(event.title);
     if (titleColor) return titleColor;
-
-    const recurringTaskColors = [
-      "#ea4335", // Red
-      "#fbbc04", // Yellow
-      "#34a853", // Green
-      "#00897b", // Teal
-      "#1565c0", // Dark Blue
-      "#6f42c1", // Purple
-    ];
+    const recurringTaskColors = ["#ea4335", "#fbbc04", "#34a853", "#00897b", "#1565c0", "#6f42c1"];
     if (event.teamMember) {
       const colorIndex = event.teamMember.charCodeAt(0) % recurringTaskColors.length;
       return recurringTaskColors[colorIndex];
     }
     return recurringTaskColors[0];
   }
-
+  if (event.teamMember && colors) {
+    const mapped = colors.get(event.teamMember);
+    if (mapped) return mapped;
+  }
   return "#1a73e8";
 };
 
@@ -72,6 +58,14 @@ const hexToRgba = (hex: string, opacity: number): string => {
   const g = parseInt(hex.slice(3, 5), 16);
   const b = parseInt(hex.slice(5, 7), 16);
   return `rgba(${r}, ${g}, ${b}, ${opacity})`;
+};
+
+const getTextColorForBg = (hex: string): string => {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  const yiq = (r * 299 + g * 587 + b * 114) / 1000;
+  return yiq >= 150 ? "#202124" : "#ffffff";
 };
 
 export default function DayView({
@@ -83,6 +77,14 @@ export default function DayView({
   isAdmin,
   deletingEventId,
 }: DayViewProps) {
+  const [vpWidth, setVpWidth] = useState(typeof window !== "undefined" ? window.innerWidth : 1024);
+  useEffect(() => {
+    const onResize = () => setVpWidth(window.innerWidth);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+  const isMobile = vpWidth < 640;
+  const isTablet = vpWidth >= 640 && vpWidth < 1024;
   const dateHeader = useMemo(
     () =>
       date.toLocaleDateString("en-US", {
@@ -90,6 +92,7 @@ export default function DayView({
         month: "long",
         day: "numeric",
         year: "numeric",
+        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
       }),
     [date]
   );
@@ -103,22 +106,16 @@ export default function DayView({
         const start = new Date(startIso);
         const duration = ev.duration ?? 60;
         const end = new Date(start.getTime() + duration * 60000);
-        const isRecurringTask = ev.source === "recurring_task";
-        const offsetMs = isRecurringTask ? 0 : UI_OFFSET_MS;
-        const adjustedStart = new Date(start.getTime() - offsetMs);
-        const adjustedEnd = new Date(end.getTime() - offsetMs);
-        const minutesSinceMidnight = adjustedStart.getHours() * 60 + adjustedStart.getMinutes();
+        const minutesSinceMidnight = start.getHours() * 60 + start.getMinutes();
 
         const top = minutesSinceMidnight * PIXELS_PER_MINUTE;
         const height = Math.max(duration * PIXELS_PER_MINUTE, 40);
-        return { ev, start, end, adjustedStart, adjustedEnd, top, height };
+        return { ev, start, end, top, height };
       })
       .filter(Boolean) as {
       ev: CalendarEvent;
       start: Date;
       end: Date;
-      adjustedStart: Date;
-      adjustedEnd: Date;
       top: number;
       height: number;
     }[];
@@ -151,8 +148,6 @@ export default function DayView({
       ev: CalendarEvent;
       start: Date;
       end: Date;
-      adjustedStart: Date;
-      adjustedEnd: Date;
       top: number;
       height: number;
       columnIndex: number;
@@ -187,8 +182,6 @@ export default function DayView({
           ev: item.ev,
           start: item.start,
           end: item.end,
-          adjustedStart: item.adjustedStart,
-          adjustedEnd: item.adjustedEnd,
           top: item.top,
           height: item.height,
           columnIndex: assignments[idx],
@@ -268,7 +261,7 @@ export default function DayView({
 
                   {/* EVENTS */}
                   {positionedEvents.map(
-                    ({ ev, start, end, adjustedStart, adjustedEnd, top, height, columnIndex, totalColumns }) => {
+                    ({ ev, start, end, top, height, columnIndex, totalColumns }) => {
                       const color = getEventColor(
                         ev,
                         teamMemberColors
@@ -280,13 +273,27 @@ export default function DayView({
                       const isRecurringTask = ev.source === "recurring_task";
                       const displayTitle = isRecurringTask ? ev.title : getEventDisplayTitle(ev);
                       const localSet = positionedEvents.filter(
-                        (p) => p !== undefined && p.adjustedStart < adjustedEnd && adjustedStart < p.adjustedEnd
+                        (p) => p !== undefined && p.start < end && start < p.end
                       );
-                      const localColumnIndices = Array.from(new Set([...localSet.map((p) => p.columnIndex), columnIndex])).sort((a, b) => a - b);
-                      const localTotal = Math.max(localColumnIndices.length, 1);
-                      const widthPercent = 100 / localTotal;
-                      const localIndex = Math.max(localColumnIndices.indexOf(columnIndex), 0);
-                      const leftPercent = localIndex * widthPercent;
+                      const sortedLocal = localSet.slice().sort((a, b) => (
+                        a.start.getTime() - b.start.getTime()
+                      ) || ((a.ev.id || "").toString().localeCompare((b.ev.id || "").toString())));
+                      const localTotal = Math.max(sortedLocal.length, 1);
+                      let widthPercent = 100 / localTotal;
+                      let localIndex = Math.max(sortedLocal.findIndex((p) => p.ev.id === ev.id), 0);
+                      let leftPercent = localIndex * widthPercent;
+                      let topOffset = top;
+                      if (isMobile) {
+                        widthPercent = 100;
+                        leftPercent = 0;
+                        topOffset = top + localIndex * 6;
+                      } else if (isTablet) {
+                        const maxCols = 3;
+                        const cols = Math.min(localTotal, maxCols);
+                        widthPercent = 100 / cols;
+                        localIndex = Math.min(localIndex, cols - 1);
+                        leftPercent = localIndex * widthPercent;
+                      }
                       return (
                         <div
                           key={ev.id}
@@ -294,28 +301,33 @@ export default function DayView({
                             deletingEventId === ev.id ? "opacity-50 pointer-events-none" : ""
                           } ${isRecurringTask ? "border-l-8" : ""}`}
                           style={{
-                            top,
+                            top: topOffset,
                             height,
                             left: `${leftPercent}%`,
                             width: `calc(${widthPercent}% - 8px)`,
-                            backgroundColor: hexToRgba(color, isRecurringTask ? 0.15 : 0.1),
-                            borderColor: hexToRgba(color, isRecurringTask ? 0.4 : 0.3),
+                            minWidth: isTablet ? 150 : 90,
+                            backgroundColor: isRecurringTask ? color : hexToRgba(color, 0.1),
+                            borderColor: isRecurringTask ? color : hexToRgba(color, 0.3),
                             borderLeftColor: color,
                             borderLeftWidth: isRecurringTask ? "8px" : "4px",
+                            color: isRecurringTask ? getTextColorForBg(color) : undefined,
                           }}
                           onClick={() => onEventClick(ev)}
                           title={`${displayTitle}\n${isRecurringTask ? ev.title : `Email: ${emailLabel}`}`}
                         >
-                          <div className="p-2 flex flex-col h-full min-h-0 gap-1">
+                          <div className={`${isMobile ? "p-1.5" : "p-2"} flex flex-col h-full min-h-0 gap-1`}>
                             <div className="flex items-start justify-between gap-2">
-                              <div className="text-xs font-semibold truncate flex-1 min-w-0 flex items-start gap-1">
+                              <div className={`${isMobile ? "text-sm" : "text-xs"} font-semibold truncate flex-1 min-w-0 flex items-start gap-1`}>
                                 {isRecurringTask && <span className="font-bold text-base leading-none">📌</span>}
                                 <span>{displayTitle}</span>
+                                {isRecurringTask && isMobile && (
+                                  <span className="ml-auto text-[10px] px-1.5 py-0.5 rounded-full" style={{ backgroundColor: hexToRgba(color, 0.2), color: getTextColorForBg(color) }}>Recurring</span>
+                                )}
                               </div>
                               <button
                                 type="button"
                                 aria-label="Delete event"
-                                className="rounded-full p-1"
+                                className={`rounded-full ${isMobile ? "p-1" : "p-1"}`}
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   onDeleteEvent(ev);
@@ -332,20 +344,22 @@ export default function DayView({
                               </button>
                             </div>
 
-                            <div className="text-xs text-[#5f6368] truncate min-w-0">
-                              {format12(adjustedStart)} – {format12(adjustedEnd)}
+                            <div className={`${isMobile ? "text-[12px]" : "text-xs"} truncate min-w-0`} style={{ color: isRecurringTask ? getTextColorForBg(color) : "#5f6368" }}>
+                              {format12(start)} – {format12(end)}
                             </div>
 
-                            <div className="text-[11px] text-[#5f6368] truncate min-w-0">
-                              {isRecurringTask ? (
-                                <span className="font-medium">{ev.title}</span>
-                              ) : (
-                                (!ev.customerName?.trim() || !ev.customerEmail?.trim()) ? CUSTOMER_NAME_FALLBACK : `Email: ${emailLabel}`
-                              )}
-                            </div>
+                            {!isMobile && (
+                              <div className="text-[11px] truncate min-w-0" style={{ color: isRecurringTask ? getTextColorForBg(color) : "#5f6368" }}>
+                                {isRecurringTask ? (
+                                  <span className="font-medium">{ev.title}</span>
+                                ) : (
+                                  (!ev.customerName?.trim() || !ev.customerEmail?.trim()) ? CUSTOMER_NAME_FALLBACK : `Email: ${emailLabel}`
+                                )}
+                              </div>
+                            )}
 
                             {ev.teamMember && (
-                              <div className="text-[11px] text-[#5f6368]">
+                              <div className={`${isMobile ? "text-[12px]" : "text-[11px]"}`} style={{ color: isRecurringTask ? getTextColorForBg(color) : "#5f6368" }}>
                                 {ev.teamMember}
                               </div>
                             )}

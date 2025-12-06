@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { X, Video, Clock, User, Trash2, Calendar } from "lucide-react";
 import { CalendarEvent } from "@/pages/Index";
-import { getColorForTitle } from "@/lib/utils";
+import { getColorForTitle, getBrowserTimeZone } from "@/lib/utils";
 import {
   getCustomerEmailDisplay,
   getCustomerNameDisplay,
@@ -17,7 +17,6 @@ interface EventDetailsModalProps {
   teamMemberColors?: Map<string, string>;
 }
 
-const DISPLAY_TIMEZONE = "UTC";
 
 const EventDetailsModal = ({ isOpen, event, onClose, onDeleteEvent, teamMemberColors }: EventDetailsModalProps) => {
   if (!isOpen || !event) return null;
@@ -34,14 +33,14 @@ const EventDetailsModal = ({ isOpen, event, onClose, onDeleteEvent, teamMemberCo
   };
 
   // Convert 24-hour time to 12-hour format for display
-  const formatTime12Hour = (isoString?: string, useUTC = true): string => {
+  const formatTime12Hour = (isoString?: string): string => {
     if (!isoString) return "N/A";
     const date = new Date(isoString);
     return date.toLocaleTimeString("en-US", {
       hour: "numeric",
       minute: "2-digit",
       hour12: true,
-      timeZone: useUTC ? DISPLAY_TIMEZONE : undefined,
+      timeZone: getBrowserTimeZone(),
     });
   };
 
@@ -56,8 +55,8 @@ const EventDetailsModal = ({ isOpen, event, onClose, onDeleteEvent, teamMemberCo
   };
 
   // Format times in 12-hour format for display
-  const startTime = event.startTime ? formatTime12Hour(event.startTime, event.source !== "recurring_task") : null;
-  const endTime = event.endTime ? formatTime12Hour(event.endTime, event.source !== "recurring_task") : null;
+  const startTime = event.startTime ? formatTime12Hour(event.startTime) : null;
+  const endTime = event.endTime ? formatTime12Hour(event.endTime) : null;
   const duration = event.duration ?? null;
 
   const displayTitle = getEventDisplayTitle(event);

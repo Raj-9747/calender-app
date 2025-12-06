@@ -3,7 +3,7 @@ import { Plus, Clock8, CalendarClock, X, Trash2 } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import { Button } from "@/components/ui/button";
 import type { CalendarEvent } from "@/pages/Index";
-import { cn, getColorForTitle } from "@/lib/utils";
+import { cn, getColorForTitle, getBrowserTimeZone } from "@/lib/utils";
 import {
   getCustomerEmailDisplay,
   getCustomerNameDisplay,
@@ -27,7 +27,6 @@ interface CalendarSidebarProps {
   deletingEventId?: string | null;
 }
 
-const DISPLAY_TIMEZONE = "UTC";
 
 const CalendarSidebar = ({
   currentDate,
@@ -82,12 +81,12 @@ const CalendarSidebar = ({
         ? new Date(start.getTime() + event.duration * 60000)
         : null;
 
-    const useUTC = event.source !== "recurring_task";
+    const tz = getBrowserTimeZone();
     const fmt = (date: Date) =>
       date.toLocaleTimeString([], {
         hour: "numeric",
         minute: "2-digit",
-        timeZone: useUTC ? DISPLAY_TIMEZONE : undefined,
+        timeZone: tz,
       });
 
     if (!end) return fmt(start);
