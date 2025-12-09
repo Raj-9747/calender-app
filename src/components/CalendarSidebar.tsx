@@ -62,12 +62,16 @@ const CalendarSidebar = ({
       .sort((a, b) => a.dateObj.getTime() - b.dateObj.getTime());
   }, [events, startOfToday]);
 
-  const formatDateLabel = (value: string) =>
-    new Date(value).toLocaleDateString(undefined, {
+  const formatDateLabel = (value: string) => {
+    const [y, m, d] = value.split("-").map(Number);
+    const local = new Date(y, (m || 1) - 1, d || 1);
+    return local.toLocaleDateString(undefined, {
       weekday: "short",
       month: "short",
       day: "numeric",
+      timeZone: getBrowserTimeZone(),
     });
+  };
 
   const formatEventTime = (event: CalendarEvent) => {
     const startIso = event.startTime ?? event.bookingTime;

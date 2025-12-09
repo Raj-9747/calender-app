@@ -139,7 +139,8 @@ const UpcomingEventsView = ({
     const today = startOfDay(new Date());
     const filtered = events
       .map((event) => {
-        const dateObj = new Date(event.date);
+        const [y, m, d] = event.date.split("-").map(Number);
+        const dateObj = new Date(y, (m || 1) - 1, d || 1);
         return { ...event, dateObj };
       })
       .filter(({ dateObj }) => startOfDay(dateObj) >= today)
@@ -267,7 +268,8 @@ const UpcomingEventsView = ({
                       const accent = getAccentColor(event, teamMemberColors);
                       const duration = event.duration ?? 60;
                       const timeRange = formatTimeRange(event);
-                      const dateLabel = formatDateWithWeekday(new Date(event.date));
+                      const [y, m, d] = event.date.split("-").map(Number);
+                      const dateLabel = formatDateWithWeekday(new Date(y, (m || 1) - 1, d || 1));
 
                       const customerName = getCustomerNameDisplay(event);
                       const customerEmail = getCustomerEmailDisplay(event);
