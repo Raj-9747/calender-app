@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { X, Video, Clock, User, Trash2, Calendar } from "lucide-react";
+import { X, Video, Clock, User, Trash2, Calendar, Edit2 } from "lucide-react";
 import { CalendarEvent } from "@/pages/Index";
 import { getColorForTitle, getBrowserTimeZone } from "@/lib/utils";
 import {
@@ -15,10 +15,11 @@ interface EventDetailsModalProps {
   onClose: () => void;
   onDeleteEvent: (event: CalendarEvent) => void;
   teamMemberColors?: Map<string, string>;
+  onEditEvent?: (event: CalendarEvent) => void;
 }
 
 
-const EventDetailsModal = ({ isOpen, event, onClose, onDeleteEvent, teamMemberColors }: EventDetailsModalProps) => {
+const EventDetailsModal = ({ isOpen, event, onClose, onDeleteEvent, teamMemberColors, onEditEvent }: EventDetailsModalProps) => {
   if (!isOpen || !event) return null;
 
   const formatDateDisplay = (dateStr: string): string => {
@@ -313,6 +314,13 @@ const EventDetailsModal = ({ isOpen, event, onClose, onDeleteEvent, teamMemberCo
 
         {/* Close Button */}
         <div className="flex justify-end gap-2">
+          <Button
+            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700"
+            onClick={() => event && onEditEvent?.(event)}
+          >
+            <Edit2 className="h-4 w-4" />
+            Edit
+          </Button>
           <Button
             variant="destructive"
             className="flex items-center gap-2"

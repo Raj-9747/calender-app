@@ -7,6 +7,7 @@ import DayView from "@/components/DayView";
 import WeekView from "@/components/WeekView";
 import UpcomingEventsView from "@/components/UpcomingEventsView";
 import EventDetailsModal from "@/components/EventDetailsModal";
+import EditEventModal from "@/components/EditEventModal";
 import { supabase } from "@/lib/supabaseClient";
 import CalendarSidebar from "@/components/CalendarSidebar";
 import AppointmentScheduleModal from "@/components/AppointmentScheduleModal";
@@ -181,6 +182,8 @@ const Index = () => {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [eventToDelete, setEventToDelete] = useState<CalendarEvent | null>(null);
   const [deletingEventId, setDeletingEventId] = useState<string | null>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [eventToEdit, setEventToEdit] = useState<CalendarEvent | null>(null);
   const [isDesktopViewport, setIsDesktopViewport] = useState<boolean>(() => {
     if (typeof window === "undefined") return true;
     return window.matchMedia("(min-width: 1024px)").matches;
@@ -896,6 +899,63 @@ const Index = () => {
     [dayViewDate, loadDayViewEvents, viewMode]
   );
 
+  const handleEditEvent = useCallback((event: CalendarEvent) => {
+    setEventToEdit(event);
+    setIsEditModalOpen(true);
+  }, []);
+
+  const handleSaveEditEvent = useCallback(
+    async (updatedEvent: CalendarEvent): Promise<void> => {
+      if (!updatedEvent || updatedEvent.source === "recurring_task") {
+        toast.error("Cannot edit recurring events");
+        return;
+      }
+
+      try {
+        const { error } = await supabase
+          .from("bookings")
+          .update({
+            product_name: updatedEvent.title || null,
+            summary: updatedEvent.description || null,
+            booking_time: updatedEvent.bookingTime,
+            meet_link: updatedEvent.meetingLink || null,
+            duration: updatedEvent.duration || 60,
+            customer_name: updatedEvent.customerName || null,
+            customer_email: updatedEvent.customerEmail || null,
+            phone_number: updatedEvent.phoneNumber || null,
+            typeOfMeeting: updatedEvent.typeOfMeeting || null,
+          })
+          .eq("id", updatedEvent.id);
+
+        if (error) {
+          console.error("Failed to update event:", error);
+          toast.error("Error updating event", {
+            description: error.message || "Please try again.",
+          });
+          return;
+        }
+
+        // Update local state
+        setEvents((prev) =>
+          prev.map((e) => (e.id === updatedEvent.id ? updatedEvent : e))
+        );
+        setDayViewEvents((prev) =>
+          prev.map((e) => (e.id === updatedEvent.id ? updatedEvent : e))
+        );
+
+        toast.success("Event updated successfully!");
+        setIsEditModalOpen(false);
+        setEventToEdit(null);
+      } catch (err) {
+        console.error("Unexpected error updating event:", err);
+        toast.error("Error updating event", {
+          description: err instanceof Error ? err.message : "An unexpected error occurred.",
+        });
+      }
+    },
+    []
+  );
+
   return (
     <div className="min-h-screen bg-[#f6f8fc]">
       <div className="flex h-screen flex-col">
@@ -1167,11 +1227,23 @@ const Index = () => {
         isOpen={isDetailsModalOpen}
         event={selectedEvent}
         onDeleteEvent={handleDeleteEvent}
+        onEditEvent={handleEditEvent}
         onClose={() => {
           setIsDetailsModalOpen(false);
           setSelectedEvent(null);
         }}
         teamMemberColors={teamMemberColors}
+      />
+
+      <EditEventModal
+        isOpen={isEditModalOpen}
+        event={eventToEdit}
+        onClose={() => {
+          setIsEditModalOpen(false);
+          setEventToEdit(null);
+        }}
+        onSave={handleSaveEditEvent}
+        isSaving={false}
       />
 
       <DeleteEventModal
