@@ -5,12 +5,13 @@ import { X } from "lucide-react";
 type DeleteEventModalProps = {
   isOpen: boolean;
   onClose: () => void;
-  onConfirm: () => Promise<void>;
+  onConfirm: (sendEmail: boolean) => Promise<void>;
   eventTitle?: string;
 };
 
 export default function DeleteEventModal({ isOpen, onClose, onConfirm, eventTitle }: DeleteEventModalProps) {
   const [isLoading, setIsLoading] = useState(false);
+  const [sendEmail, setSendEmail] = useState(false);
 
   if (!isOpen) return null;
 
@@ -39,9 +40,32 @@ export default function DeleteEventModal({ isOpen, onClose, onConfirm, eventTitl
         </button>
 
         <h2 className="text-xl font-semibold text-[#202124]">Delete Event?</h2>
-        <p className="mt-2 text-sm text-[#5f6368]">
-          Are you sure you want to delete event: {eventTitle || "Untitled Event"}?
-        </p>
+        {isLoading ? (
+          <div className="mt-4 flex items-center gap-3">
+            <svg className="h-5 w-5 animate-spin text-[#1a73e8]" viewBox="0 0 24 24">
+              <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" opacity="0.25" />
+              <path d="M22 12a10 10 0 0 1-10 10" stroke="currentColor" strokeWidth="4" fill="none" opacity="0.75" />
+            </svg>
+            <p className="text-sm font-medium text-[#202124]">Deleting event… please wait</p>
+          </div>
+        ) : (
+          <p className="mt-2 text-sm text-[#5f6368]">
+            Are you sure you want to delete event: {eventTitle || "Untitled Event"}?
+          </p>
+        )}
+
+        {!isLoading && (
+          <label className="mt-4 flex items-center gap-2 text-sm text-[#5f6368] select-none">
+          <input
+            type="checkbox"
+            className="h-4 w-4 rounded border border-[#c4c7cf] text-[#1a73e8] focus:ring-[#1a73e8]"
+            checked={sendEmail}
+            onChange={(e) => setSendEmail(e.target.checked)}
+            disabled={isLoading}
+          />
+          <span>Send email notification for this deleted event</span>
+        </label>
+        )}
 
         <div className="mt-6 flex justify-end gap-2">
           <Button
@@ -61,7 +85,7 @@ export default function DeleteEventModal({ isOpen, onClose, onConfirm, eventTitl
               if (isLoading) return;
               setIsLoading(true);
               try {
-                await onConfirm();
+                await onConfirm(sendEmail);
               } finally {
                 setIsLoading(false);
               }

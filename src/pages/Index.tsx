@@ -737,7 +737,7 @@ const Index = () => {
     setIsDeleteModalOpen(true);
   }, []);
 
-  const confirmDelete = useCallback(async () => {
+  const confirmDelete = useCallback(async (sendEmail: boolean) => {
     if (!eventToDelete) return;
     const fullEventObject = {
       id: eventToDelete.id,
@@ -763,21 +763,69 @@ const Index = () => {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ event: fullEventObject }),
+        body: JSON.stringify({ event: fullEventObject, sendEmail }),
       });
+
+      // Check if response is ok
       if (!response.ok) {
         throw new Error(`Delete webhook responded with status ${response.status}`);
       }
-      toast.success("Event deleted successfully.");
-      setIsDeleteModalOpen(false);
-      setEventToDelete(null);
+
+      // Parse the JSON response
+      let responseData;
+      try {
+        responseData = await response.json();
+      } catch (parseError) {
+        // If response is not JSON, treat as error
+        throw new Error("Invalid response from server");
+      }
+
+      // Check for success status
+      if (responseData?.status === "success") {
+        // Success - refresh events and update UI
+        toast.success("Event deleted successfully");
+        
+        // Close modals
+        setIsDeleteModalOpen(false);
+        setIsDetailsModalOpen(false);
+        setEventToDelete(null);
+        setSelectedEvent(null);
+        
+        // Refresh events from database
+        const refreshedEvents = await loadEvents();
+        
+        // If in day view, also refresh day view events
+        if (viewMode === "day") {
+          await loadDayViewEvents(dayViewDate);
+        }
+        
+        // Also refresh recurring tasks
+        const refreshedRecurringTasks = await loadRecurringTasks();
+        
+        // Update mobile sheet events if open (use refreshed data)
+        if (mobileSheetDate && mobileSheetEvents.length > 0) {
+          const dateKey = formatDate(mobileSheetDate);
+          const bookingEventsForDay = refreshedEvents.filter((event) => event.date === dateKey);
+          const recurringTasksForDay = refreshedRecurringTasks.filter((event) => event.date === dateKey);
+          setMobileSheetEvents([...bookingEventsForDay, ...recurringTasksForDay]);
+        }
+      } else {
+        // Non-success response
+        const errorMessage = responseData?.message || "Failed to delete the event. Please try again.";
+        throw new Error(errorMessage);
+      }
     } catch (error) {
       console.error("Error deleting event:", error);
-      toast.error("Error deleting event. Please try again.");
+      const errorMessage = error instanceof Error ? error.message : "Failed to delete the event. Please try again.";
+      toast.error("Failed to delete the event. Please try again.", {
+        description: errorMessage,
+      });
+      // Event remains visible - don't remove it from UI
     } finally {
+      // Always remove loading state
       setDeletingEventId(null);
     }
-  }, [eventToDelete]);
+  }, [eventToDelete, loadEvents, loadDayViewEvents, loadRecurringTasks, viewMode, dayViewDate, events, recurringTaskEvents, mobileSheetDate, mobileSheetEvents, formatDate]);
 
   const handleAddAppointment = useCallback(
     async (values: AppointmentFormValues): Promise<void> => {
