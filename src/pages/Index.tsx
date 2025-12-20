@@ -184,6 +184,7 @@ const Index = () => {
   const [deletingEventId, setDeletingEventId] = useState<string | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [eventToEdit, setEventToEdit] = useState<CalendarEvent | null>(null);
+  const [isSavingEditEvent, setIsSavingEditEvent] = useState(false);
   const [isDesktopViewport, setIsDesktopViewport] = useState<boolean>(() => {
     if (typeof window === "undefined") return true;
     return window.matchMedia("(min-width: 1024px)").matches;
@@ -911,6 +912,8 @@ const Index = () => {
         return;
       }
 
+      setIsSavingEditEvent(true);
+
       try {
         const { error } = await supabase
           .from("bookings")
@@ -935,12 +938,20 @@ const Index = () => {
           return;
         }
 
-        // Update local state
-        setEvents((prev) =>
-          prev.map((e) => (e.id === updatedEvent.id ? updatedEvent : e))
+        // Refresh events from the server so all calendar views stay in sync
+        const refreshedEvents = await loadEvents();
+        setEvents(refreshedEvents);
+
+        if (viewMode === "day") {
+          await loadDayViewEvents(dayViewDate);
+        }
+
+        // Also update any already-selected event / mobile sheet events in memory
+        setSelectedEvent((prev) =>
+          prev && prev.id === updatedEvent.id ? { ...prev, ...updatedEvent } : prev
         );
-        setDayViewEvents((prev) =>
-          prev.map((e) => (e.id === updatedEvent.id ? updatedEvent : e))
+        setMobileSheetEvents((prev) =>
+          prev.map((e) => (e.id === updatedEvent.id ? { ...e, ...updatedEvent } : e))
         );
 
         toast.success("Event updated successfully!");
@@ -951,9 +962,11 @@ const Index = () => {
         toast.error("Error updating event", {
           description: err instanceof Error ? err.message : "An unexpected error occurred.",
         });
+      } finally {
+        setIsSavingEditEvent(false);
       }
     },
-    []
+    [dayViewDate, loadDayViewEvents, loadEvents, viewMode]
   );
 
   return (
@@ -1243,7 +1256,7 @@ const Index = () => {
           setEventToEdit(null);
         }}
         onSave={handleSaveEditEvent}
-        isSaving={false}
+        isSaving={isSavingEditEvent}
       />
 
       <DeleteEventModal
