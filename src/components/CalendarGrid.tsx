@@ -35,8 +35,8 @@ const CalendarGrid = ({
         const g = parseInt(titleColor.slice(3, 5), 16);
         const b = parseInt(titleColor.slice(5, 7), 16);
         return {
-          bg: `rgba(${r}, ${g}, ${b}, 0.15)`,
-          border: `rgba(${r}, ${g}, ${b}, 0.4)`,
+          bg: `rgba(${r}, ${g}, ${b}, 0.12)`,
+          border: `rgba(${r}, ${g}, ${b}, 0.3)`,
           text: titleColor,
         };
       }
@@ -59,8 +59,8 @@ const CalendarGrid = ({
         const g = parseInt(color.slice(3, 5), 16);
         const b = parseInt(color.slice(5, 7), 16);
         return {
-          bg: `rgba(${r}, ${g}, ${b}, 0.15)`,
-          border: `rgba(${r}, ${g}, ${b}, 0.4)`,
+          bg: `rgba(${r}, ${g}, ${b}, 0.12)`,
+          border: `rgba(${r}, ${g}, ${b}, 0.3)`,
           text: color,
         };
       }
@@ -73,9 +73,10 @@ const CalendarGrid = ({
       const g = parseInt(color.slice(3, 5), 16);
       const b = parseInt(color.slice(5, 7), 16);
       return {
-        bg: `rgba(${r}, ${g}, ${b}, 0.1)`,
-        border: `rgba(${r}, ${g}, ${b}, 0.3)`,
-        text: color,
+        bg: `rgba(${r}, ${g}, ${b}, 0.92)`,
+        border: `rgba(${r}, ${g}, ${b}, 0.9)`,
+        // Use white text on strong colored pills for better readability
+        text: "#ffffff",
       };
     }
     // Default blue color for events without team member
@@ -200,7 +201,7 @@ const CalendarGrid = ({
                         return (
                           <div
                             key={event.id}
-                            className={`relative rounded-lg px-2 py-1 text-[11px] font-medium line-clamp-2 cursor-pointer hover:opacity-80 transition-opacity sm:text-xs ${
+                            className={`relative rounded-lg px-2 py-1 text-xs font-medium leading-snug line-clamp-2 cursor-pointer hover:opacity-80 transition-opacity ${
                               deletingEventId === event.id ? "opacity-50 pointer-events-none" : ""
                             }`}
                             style={{
@@ -216,9 +217,9 @@ const CalendarGrid = ({
                               onEventClick(event);
                             }}
                             title={`${displayTitle}\n${isRecurringTask ? event.title : `Email: ${emailDisplay}`}`}
-                          >
+                            >
                             <div className="flex items-center gap-1">
-                              <span className="flex-1 truncate">
+                              <span className="flex-1 truncate text-[11px] sm:text-xs">
                                 {isRecurringTask && <span className="font-bold">📌 </span>}
                                 {displayTitle}
                               </span>

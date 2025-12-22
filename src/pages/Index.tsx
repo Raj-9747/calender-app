@@ -1378,7 +1378,7 @@ const Index = () => {
                       }`}
                       style={{
                         borderLeft: isRecurringTask ? `8px solid ${accent}` : `5px solid ${accent}`,
-                        backgroundColor: hexToRgba(accent, isRecurringTask ? 0.12 : 0.08),
+                        backgroundColor: hexToRgba(accent, isRecurringTask ? 0.12 : 0.92),
                       }}
                     >
                       <button

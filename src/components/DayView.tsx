@@ -266,9 +266,6 @@ export default function DayView({
                         ev,
                         teamMemberColors
                       );
-                      const bg = hexToRgba(color, 0.1);
-                      const border = hexToRgba(color, 0.3);
-
                       const emailLabel = getCustomerEmailDisplay(ev);
                       const isRecurringTask = ev.source === "recurring_task";
                       const displayTitle = isRecurringTask ? ev.title : getEventDisplayTitle(ev);
@@ -306,11 +303,18 @@ export default function DayView({
                             left: `${leftPercent}%`,
                             width: `calc(${widthPercent}% - 8px)`,
                             minWidth: isTablet ? 150 : 90,
-                            backgroundColor: isRecurringTask ? color : hexToRgba(color, 0.1),
-                            borderColor: isRecurringTask ? color : hexToRgba(color, 0.3),
+                            // Keep the same base color but use softer fills and stronger borders.
+                            // Normal events are slightly darker so they stand out more.
+                            backgroundColor: isRecurringTask
+                              ? hexToRgba(color, 0.10)
+                              : hexToRgba(color, 0.35),
+                            borderColor: isRecurringTask
+                              ? hexToRgba(color, 0.40)
+                              : hexToRgba(color, 0.90),
                             borderLeftColor: color,
                             borderLeftWidth: isRecurringTask ? "8px" : "4px",
-                            color: isRecurringTask ? getTextColorForBg(color) : undefined,
+                            // Use a consistent dark text color for better readability on light tints
+                            color: "#202124",
                           }}
                           onClick={() => onEventClick(ev)}
                           title={`${displayTitle}\n${isRecurringTask ? ev.title : `Email: ${emailLabel}`}`}
@@ -321,7 +325,15 @@ export default function DayView({
                                 {isRecurringTask && <span className="font-bold text-base leading-none">📌</span>}
                                 <span>{displayTitle}</span>
                                 {isRecurringTask && isMobile && (
-                                  <span className="ml-auto text-[10px] px-1.5 py-0.5 rounded-full" style={{ backgroundColor: hexToRgba(color, 0.2), color: getTextColorForBg(color) }}>Recurring</span>
+                                  <span
+                                    className="ml-auto text-[10px] px-1.5 py-0.5 rounded-full"
+                                    style={{
+                                      backgroundColor: hexToRgba(color, 0.10),
+                                      color: "#202124",
+                                    }}
+                                  >
+                                    Recurring
+                                  </span>
                                 )}
                               </div>
                               <button
@@ -344,12 +356,18 @@ export default function DayView({
                               </button>
                             </div>
 
-                            <div className={`${isMobile ? "text-[12px]" : "text-xs"} truncate min-w-0`} style={{ color: isRecurringTask ? getTextColorForBg(color) : "#5f6368" }}>
+                            <div
+                              className={`${isMobile ? "text-[12px]" : "text-xs"} truncate min-w-0`}
+                              style={{ color: "#3c4043" }}
+                            >
                               {format12(start)} – {format12(end)}
                             </div>
 
                             {!isMobile && (
-                              <div className="text-[11px] truncate min-w-0" style={{ color: isRecurringTask ? getTextColorForBg(color) : "#5f6368" }}>
+                              <div
+                                className="text-[11px] truncate min-w-0"
+                                style={{ color: "#5f6368" }}
+                              >
                                 {isRecurringTask ? (
                                   <span className="font-medium">{ev.title}</span>
                                 ) : (
@@ -359,7 +377,10 @@ export default function DayView({
                             )}
 
                             {ev.teamMember && (
-                              <div className={`${isMobile ? "text-[12px]" : "text-[11px]"}`} style={{ color: isRecurringTask ? getTextColorForBg(color) : "#5f6368" }}>
+                              <div
+                                className={`${isMobile ? "text-[12px]" : "text-[11px]"}`}
+                                style={{ color: "#5f6368" }}
+                              >
                                 {ev.teamMember}
                               </div>
                             )}

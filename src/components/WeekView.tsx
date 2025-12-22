@@ -300,11 +300,12 @@ export default function WeekView({
                               left: leftStyle,
                               width: widthStyle,
                               minWidth: isTablet ? 150 : 90,
-                              backgroundColor: isRecurringTask ? color : (isCompact ? hexToRgba(color, 0.15) : hexToRgba(color, 0.1)),
-                              borderColor: isRecurringTask ? color : (isCompact ? hexToRgba(color, 0.6) : hexToRgba(color, 0.3)),
+                              backgroundColor: isRecurringTask ? hexToRgba(color, 0.12) : hexToRgba(color, 0.92),
+                              borderColor: isRecurringTask ? hexToRgba(color, 0.3) : hexToRgba(color, 0.9),
                               borderLeftColor: isCompact ? undefined : color,
                               borderLeftWidth: isCompact ? undefined : isRecurringTask ? "8px" : "4px",
-                              color: isRecurringTask ? getTextColorForBg(color) : undefined,
+                              // Use a consistent dark text color for better readability on light tints
+                              color: "#202124",
                             }}
                             onClick={() => onEventClick(ev)}
                             title={`${displayTitle}\n${isRecurringTask ? ev.title : `Email: ${emailLabel}`}`}
@@ -336,11 +337,17 @@ export default function WeekView({
                                   </button>
                                 )}
                               </div>
-                              <div className={`${isCompact ? "text-[11px]" : "text-xs"} truncate min-w-0`} style={{ color: isRecurringTask ? getTextColorForBg(color) : (isCompact ? "#202124" : "#5f6368") }}>
+                              <div
+                                className={`${isCompact ? "text-[11px]" : "text-xs"} truncate min-w-0`}
+                                style={{ color: "#3c4043" }}
+                              >
                                 {format12(start)}
                               </div>
                               {!isCompact && (
-                                <div className="text-[11px] truncate min-w-0" style={{ color: isRecurringTask ? getTextColorForBg(color) : "#5f6368" }}>
+                                <div
+                                  className="text-[11px] truncate min-w-0"
+                                  style={{ color: "#5f6368" }}
+                                >
                                   {isRecurringTask ? (
                                     <span className="font-medium">{ev.title}</span>
                                   ) : (
@@ -349,7 +356,12 @@ export default function WeekView({
                                 </div>
                               )}
                               {ev.teamMember && !isCompact && (
-                                <div className="text-[11px]" style={{ color: isRecurringTask ? getTextColorForBg(color) : "#5f6368" }}>{ev.teamMember}</div>
+                                <div
+                                  className="text-[11px]"
+                                  style={{ color: "#5f6368" }}
+                                >
+                                  {ev.teamMember}
+                                </div>
                               )}
                             </div>
                           </div>
