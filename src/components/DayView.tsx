@@ -262,35 +262,27 @@ export default function DayView({
                   {/* EVENTS */}
                   {positionedEvents.map(
                     ({ ev, start, end, top, height, columnIndex, totalColumns }) => {
-                      const color = getEventColor(
-                        ev,
-                        teamMemberColors
-                      );
+                      const color = getEventColor(ev, teamMemberColors);
                       const emailLabel = getCustomerEmailDisplay(ev);
                       const isRecurringTask = ev.source === "recurring_task";
                       const displayTitle = isRecurringTask ? ev.title : getEventDisplayTitle(ev);
-                      const localSet = positionedEvents.filter(
-                        (p) => p !== undefined && p.start < end && start < p.end
-                      );
-                      const sortedLocal = localSet.slice().sort((a, b) => (
-                        a.start.getTime() - b.start.getTime()
-                      ) || ((a.ev.id || "").toString().localeCompare((b.ev.id || "").toString())));
-                      const localTotal = Math.max(sortedLocal.length, 1);
-                      let widthPercent = 100 / localTotal;
-                      let localIndex = Math.max(sortedLocal.findIndex((p) => p.ev.id === ev.id), 0);
-                      let leftPercent = localIndex * widthPercent;
-                      let topOffset = top;
-                      if (isMobile) {
-                        widthPercent = 100;
-                        leftPercent = 0;
-                        topOffset = top + localIndex * 6;
-                      } else if (isTablet) {
-                        const maxCols = 3;
-                        const cols = Math.min(localTotal, maxCols);
-                        widthPercent = 100 / cols;
-                        localIndex = Math.min(localIndex, cols - 1);
-                        leftPercent = localIndex * widthPercent;
-                      }
+                      const gutter = isMobile ? 6 : 8;
+                      const effectiveColumns = isMobile
+                        ? Math.max(1, Math.min(totalColumns, 2))
+                        : isTablet
+                        ? Math.max(1, Math.min(totalColumns, 3))
+                        : Math.max(1, totalColumns);
+                      const normalizedIndex = Math.min(columnIndex, effectiveColumns - 1);
+                      const widthPercent = 100 / effectiveColumns;
+                      const leftPercent = normalizedIndex * widthPercent;
+                      const topOffset = isMobile ? top + normalizedIndex * 6 : top;
+                      const leftStyle = `calc(${leftPercent}% + ${gutter / 2}px)`;
+                      const widthStyle = `calc(${widthPercent}% - ${gutter}px)`;
+                      const fill = isRecurringTask ? hexToRgba(color, 0.12) : hexToRgba(color, 0.82);
+                      const borderTint = isRecurringTask ? hexToRgba(color, 0.4) : hexToRgba(color, 0.95);
+                      const primaryTextColor = isRecurringTask ? "#202124" : getTextColorForBg(color);
+                      const subtleTextColor = primaryTextColor === "#ffffff" ? "rgba(255,255,255,0.85)" : "#5f6368";
+                      const timeTextColor = primaryTextColor === "#ffffff" ? "rgba(255,255,255,0.92)" : "#3c4043";
                       return (
                         <div
                           key={ev.id}
@@ -300,21 +292,14 @@ export default function DayView({
                           style={{
                             top: topOffset,
                             height,
-                            left: `${leftPercent}%`,
-                            width: `calc(${widthPercent}% - 8px)`,
-                            minWidth: isTablet ? 150 : 90,
-                            // Keep the same base color but use softer fills and stronger borders.
-                            // Normal events are slightly darker so they stand out more.
-                            backgroundColor: isRecurringTask
-                              ? hexToRgba(color, 0.10)
-                              : hexToRgba(color, 0.35),
-                            borderColor: isRecurringTask
-                              ? hexToRgba(color, 0.40)
-                              : hexToRgba(color, 0.90),
+                            left: leftStyle,
+                            width: widthStyle,
+                            minWidth: isTablet ? 140 : 110,
+                            backgroundColor: fill,
+                            borderColor: borderTint,
                             borderLeftColor: color,
                             borderLeftWidth: isRecurringTask ? "8px" : "4px",
-                            // Use a consistent dark text color for better readability on light tints
-                            color: "#202124",
+                            color: primaryTextColor,
                           }}
                           onClick={() => onEventClick(ev)}
                           title={`${displayTitle}\n${isRecurringTask ? ev.title : `Email: ${emailLabel}`}`}
@@ -328,8 +313,8 @@ export default function DayView({
                                   <span
                                     className="ml-auto text-[10px] px-1.5 py-0.5 rounded-full"
                                     style={{
-                                      backgroundColor: hexToRgba(color, 0.10),
-                                      color: "#202124",
+                                      backgroundColor: hexToRgba(color, 0.14),
+                                      color: primaryTextColor,
                                     }}
                                   >
                                     Recurring
@@ -351,14 +336,17 @@ export default function DayView({
                                     <path d="M22 12a10 10 0 0 1-10 10" stroke="currentColor" strokeWidth="4" fill="none" opacity="0.75" />
                                   </svg>
                                 ) : (
-                                  <Trash2 className="h-3.5 w-3.5 text-[#9aa0a6] hover:text-[#d93025]" />
+                                  <Trash2
+                                    className="h-3.5 w-3.5 hover:text-[#d93025]"
+                                    style={{ color: subtleTextColor }}
+                                  />
                                 )}
                               </button>
                             </div>
 
                             <div
                               className={`${isMobile ? "text-[12px]" : "text-xs"} truncate min-w-0`}
-                              style={{ color: "#3c4043" }}
+                              style={{ color: timeTextColor }}
                             >
                               {format12(start)} – {format12(end)}
                             </div>
@@ -366,7 +354,7 @@ export default function DayView({
                             {!isMobile && (
                               <div
                                 className="text-[11px] truncate min-w-0"
-                                style={{ color: "#5f6368" }}
+                                style={{ color: subtleTextColor }}
                               >
                                 {isRecurringTask ? (
                                   <span className="font-medium">{ev.title}</span>
@@ -379,7 +367,7 @@ export default function DayView({
                             {ev.teamMember && (
                               <div
                                 className={`${isMobile ? "text-[12px]" : "text-[11px]"}`}
-                                style={{ color: "#5f6368" }}
+                                style={{ color: subtleTextColor }}
                               >
                                 {ev.teamMember}
                               </div>

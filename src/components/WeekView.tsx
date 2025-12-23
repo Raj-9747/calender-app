@@ -248,44 +248,21 @@ export default function WeekView({
                         const emailLabel = getCustomerEmailDisplay(ev);
                         const isRecurringTask = ev.source === "recurring_task";
                         const displayTitle = isRecurringTask ? ev.title : getEventDisplayTitle(ev);
-                        const localSet = positioned.filter((p) => p.start < end && start < p.end);
-                        const sortedLocal = localSet.slice().sort((a, b) => (
-                          a.start.getTime() - b.start.getTime()
-                        ) || ((a.ev.id || "").toString().localeCompare((b.ev.id || "").toString())));
-                        const localTotal = Math.max(sortedLocal.length, 1);
-                        let widthPercent = 100 / localTotal;
-                        let localIndex = Math.max(sortedLocal.findIndex((p) => p.ev.id === ev.id), 0);
-                        let leftPercent = localIndex * widthPercent;
-                        let topOffset = top;
-                        const gutterPx = 4;
-                        let leftStyle: string;
-                        let widthStyle: string;
-                        if (isMobile) {
-                          widthPercent = 100;
-                          leftPercent = 0;
-                          topOffset = top + localIndex * 6;
-                          leftStyle = `calc(${leftPercent}% + ${gutterPx / 2}px)`;
-                          widthStyle = `calc(${widthPercent}% - ${gutterPx}px)`;
-                        } else if (isTablet) {
-                          if (localTotal > 3) {
-                            const colWidth = 150;
-                            const leftPx = localIndex * (colWidth + gutterPx);
-                            leftStyle = `${leftPx + gutterPx / 2}px`;
-                            widthStyle = `${colWidth}px`;
-                          } else {
-                            const cols = Math.min(localTotal, 3);
-                            widthPercent = 100 / cols;
-                            localIndex = Math.min(localIndex, cols - 1);
-                            leftPercent = localIndex * widthPercent;
-                            leftStyle = `calc(${leftPercent}% + ${gutterPx / 2}px)`;
-                            widthStyle = `calc(${widthPercent}% - ${gutterPx}px)`;
-                          }
-                        } else {
-                          leftStyle = `calc(${leftPercent}% + ${gutterPx / 2}px)`;
-                          widthStyle = `calc(${widthPercent}% - ${gutterPx}px)`;
-                        }
+                        const gutterPx = 6;
+                        const hasMobileStack = isMobile;
+                        const effectiveColumns = hasMobileStack ? totalColumns : Math.max(1, totalColumns);
+                        const widthPercent = hasMobileStack ? 100 : 100 / effectiveColumns;
+                        const leftPercent = hasMobileStack ? 0 : columnIndex * widthPercent;
+                        const topOffset = hasMobileStack ? top + columnIndex * 6 : top;
+                        const leftStyle = `calc(${leftPercent}% + ${gutterPx / 2}px)`;
+                        const widthStyle = `calc(${widthPercent}% - ${gutterPx}px)`;
                         const titleSizing = totalColumns >= 3 ? "text-[11px] leading-tight" : "text-xs";
                         const isCompact = isMobile || totalColumns >= 2;
+                        const fill = isRecurringTask ? hexToRgba(color, 0.14) : hexToRgba(color, 0.85);
+                        const borderTint = isRecurringTask ? hexToRgba(color, 0.35) : hexToRgba(color, 0.95);
+                        const primaryTextColor = isRecurringTask ? "#202124" : getTextColorForBg(color);
+                        const subtleTextColor = primaryTextColor === "#ffffff" ? "rgba(255,255,255,0.85)" : "#5f6368";
+                        const timeTextColor = primaryTextColor === "#ffffff" ? "rgba(255,255,255,0.92)" : "#3c4043";
                         return (
                           <div
                             key={ev.id}
@@ -299,13 +276,12 @@ export default function WeekView({
                               height,
                               left: leftStyle,
                               width: widthStyle,
-                              minWidth: isTablet ? 150 : 90,
-                              backgroundColor: isRecurringTask ? hexToRgba(color, 0.12) : hexToRgba(color, 0.92),
-                              borderColor: isRecurringTask ? hexToRgba(color, 0.3) : hexToRgba(color, 0.9),
+                              minWidth: undefined,
+                              backgroundColor: fill,
+                              borderColor: borderTint,
                               borderLeftColor: isCompact ? undefined : color,
                               borderLeftWidth: isCompact ? undefined : isRecurringTask ? "8px" : "4px",
-                              // Use a consistent dark text color for better readability on light tints
-                              color: "#202124",
+                              color: primaryTextColor,
                             }}
                             onClick={() => onEventClick(ev)}
                             title={`${displayTitle}\n${isRecurringTask ? ev.title : `Email: ${emailLabel}`}`}
@@ -332,21 +308,24 @@ export default function WeekView({
                                         <path d="M22 12a10 10 0 0 1-10 10" stroke="currentColor" strokeWidth="4" fill="none" opacity="0.75" />
                                       </svg>
                                     ) : (
-                                      <Trash2 className="h-3.5 w-3.5 text-[#9aa0a6] hover:text-[#d93025]" />
+                                      <Trash2
+                                        className="h-3.5 w-3.5 hover:text-[#d93025]"
+                                        style={{ color: subtleTextColor }}
+                                      />
                                     )}
                                   </button>
                                 )}
                               </div>
                               <div
                                 className={`${isCompact ? "text-[11px]" : "text-xs"} truncate min-w-0`}
-                                style={{ color: "#3c4043" }}
+                                style={{ color: timeTextColor }}
                               >
-                                {format12(start)}
+                                {format12(start)}{end ? ` – ${format12(end)}` : ""}
                               </div>
                               {!isCompact && (
                                 <div
                                   className="text-[11px] truncate min-w-0"
-                                  style={{ color: "#5f6368" }}
+                                  style={{ color: subtleTextColor }}
                                 >
                                   {isRecurringTask ? (
                                     <span className="font-medium">{ev.title}</span>
@@ -358,7 +337,7 @@ export default function WeekView({
                               {ev.teamMember && !isCompact && (
                                 <div
                                   className="text-[11px]"
-                                  style={{ color: "#5f6368" }}
+                                  style={{ color: subtleTextColor }}
                                 >
                                   {ev.teamMember}
                                 </div>

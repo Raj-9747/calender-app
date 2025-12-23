@@ -247,21 +247,29 @@ const CalendarGrid = ({
                       })}
                     </div>
 
-                    <div className="flex flex-wrap items-center gap-1 md:hidden min-h-[16px]">
-                      {dayEvents.slice(0, 5).map((event) => {
-                        const colors = getEventColor(event);
-                        return (
-                          <span
-                            key={`${event.id}-dot`}
-                            className="h-2.5 w-2.5 rounded-full"
-                            style={{ backgroundColor: colors.text }}
-                          />
-                        );
-                      })}
-                      {dayEvents.length > 5 && (
-                        <span className="text-[10px] font-medium text-[#5f6368]">
-                          +{dayEvents.length - 5}
-                        </span>
+                    <div className="grid grid-cols-2 gap-x-1.5 gap-y-1 md:hidden min-h-[18px]">
+                      {dayEvents.length === 0 ? (
+                        <span className="h-3" aria-hidden />
+                      ) : (
+                        <>
+                          {dayEvents.slice(0, 5).map((event) => {
+                            const colors = getEventColor(event);
+                            const dotColor =
+                              colors.text === "#ffffff" ? colors.border : colors.text;
+                            return (
+                              <span
+                                key={`${event.id}-dot`}
+                                className="h-3 w-3 rounded-full border border-white shadow-[0_0_0_1px_rgba(0,0,0,0.06)] justify-self-start"
+                                style={{ backgroundColor: dotColor }}
+                              />
+                            );
+                          })}
+                          {dayEvents.length > 5 && (
+                            <span className="col-span-2 text-[10px] font-semibold text-[#3c4043]">
+                              +{dayEvents.length - 5}
+                            </span>
+                          )}
+                        </>
                       )}
                     </div>
                   </div>

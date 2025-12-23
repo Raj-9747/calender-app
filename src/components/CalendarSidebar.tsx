@@ -119,7 +119,9 @@ const CalendarSidebar = ({
           showCollapsedShell ? "w-16 px-3 py-4" : "w-full max-w-sm px-4 py-6 sm:px-6"
         )
       : cn(
-          "fixed inset-y-0 left-0 z-50 h-full w-full max-w-sm px-4 py-6 sm:w-96 sm:px-6 shadow-xl transform",
+          // Mobile / small viewports: use fluid, symmetric padding that scales with width.
+          // Keep this relatively light so nested sections can control fine‑grained spacing.
+          "fixed inset-y-0 left-0 z-50 h-full w-full max-w-sm px-3 py-4 sm:w-96 sm:px-4 sm:py-5 md:px-5 md:py-6 shadow-xl transform",
           isOpen ? "translate-x-0" : "-translate-x-full"
         )
   );
@@ -191,8 +193,20 @@ const CalendarSidebar = ({
           </div>
 
       {/* CALENDAR */}
-      <div className="px-4 py-4">
-        <div className="rounded-2xl border border-[#e0e3eb] bg-white shadow-sm p-4">
+      <div
+        className={cn(
+          "w-full",
+          isDesktop
+            ? "px-4 py-4 sm:px-6 sm:py-6"
+            : "px-2 py-3 sm:px-3 sm:py-4 md:px-4 md:py-5"
+        )}
+      >
+        <div
+          className={cn(
+            "w-full max-w-full mx-auto rounded-2xl border border-[#e0e3eb] bg-white shadow-sm overflow-hidden",
+            isDesktop ? "p-3 sm:p-4" : "p-2 sm:p-3 md:p-4"
+          )}
+        >
           <div className="flex justify-center">
             <Calendar
               mode="single"
@@ -201,7 +215,7 @@ const CalendarSidebar = ({
                 if (!date) return;
                 runActionAndCollapse(() => onSelectDate(date));
               }}
-              className="w-full max-w-sm min-w-0 p-0 [&_.rdp-months]:flex [&_.rdp-months]:flex-col [&_.rdp]:mx-auto"
+              className="w-full max-w-full min-w-0 p-0 sm:p-1 [&_.rdp-months]:flex [&_.rdp-months]:flex-col [&_.rdp]:mx-auto [&_.rdp-table]:w-full"
             />
           </div>
         </div>

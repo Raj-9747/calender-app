@@ -239,6 +239,14 @@ const Index = () => {
     const b = bigint & 255;
     return `rgba(${r}, ${g}, ${b}, ${alpha})`;
   };
+  const getTextColorForBg = (hex: string): string => {
+    const sanitized = hex.replace("#", "");
+    const r = Number.parseInt(sanitized.slice(0, 2), 16);
+    const g = Number.parseInt(sanitized.slice(2, 4), 16);
+    const b = Number.parseInt(sanitized.slice(4, 6), 16);
+    const yiq = (r * 299 + g * 587 + b * 114) / 1000;
+    return yiq >= 150 ? "#202124" : "#ffffff";
+  };
   useEffect(() => {
     return () => {
       if (mobileSheetCloseTimeout.current) {
@@ -1370,6 +1378,10 @@ const Index = () => {
                     : null;
                   const accent = getMobileEventAccent(event);
                   const isRecurringTask = event.source === "recurring_task";
+                  const textColor = isRecurringTask ? "#202124" : getTextColorForBg(accent);
+                  const subtleText = textColor === "#ffffff" ? "rgba(255,255,255,0.82)" : "#5f6368";
+                  const timeText = textColor === "#ffffff" ? "rgba(255,255,255,0.9)" : "#202124";
+                  const linkColor = textColor === "#ffffff" ? "rgba(255,255,255,0.92)" : "#1a73e8";
                   return (
                     <div
                       key={event.id}
@@ -1378,7 +1390,8 @@ const Index = () => {
                       }`}
                       style={{
                         borderLeft: isRecurringTask ? `8px solid ${accent}` : `5px solid ${accent}`,
-                        backgroundColor: hexToRgba(accent, isRecurringTask ? 0.12 : 0.92),
+                        backgroundColor: hexToRgba(accent, isRecurringTask ? 0.12 : 0.9),
+                        color: textColor,
                       }}
                     >
                       <button
@@ -1398,40 +1411,38 @@ const Index = () => {
                             <path d="M22 12a10 10 0 0 1-10 10" stroke="currentColor" strokeWidth="4" fill="none" opacity="0.75" />
                           </svg>
                         ) : (
-                          <Trash2 className="h-4 w-4 text-[#9aa0a6] hover:text-[#d93025]" />
+                          <Trash2 className="h-4 w-4" style={{ color: subtleText }} />
                         )}
                       </button>
-                      <p className="text-base font-semibold text-[#202124] mb-1 flex items-center gap-2">
+                      <p className="text-base font-semibold mb-1 flex items-center gap-2">
                         {isRecurringTask && <span className="text-lg">📌</span>}
                         {event.title || "Untitled Event"}
                       </p>
-                      <p className="text-sm text-[#5f6368] mb-2">
+                      <p className="text-sm mb-2" style={{ color: subtleText }}>
                         {isRecurringTask ? (
-                          <span className="font-medium text-[#005fcc]">Recurring Task</span>
+                          <span className="font-medium">Recurring Task</span>
                         ) : (
                           <>Customer: {(!event.customerName?.trim() || !event.customerEmail?.trim()) ? "No customer details provided" : event.customerName}</>
                         )}
                       </p>
-                      <div className="text-sm text-[#202124] flex flex-wrap gap-x-4 gap-y-1 mb-3">
-                        <span>
-                          Time: {startTime}
-                          {endTime ? ` – ${endTime}` : ""}
-                        </span>
-                        {event.duration && <span>Duration: {event.duration} min</span>}
+                      <div className="text-sm flex flex-wrap gap-x-4 gap-y-1 mb-3" style={{ color: timeText }}>
+                        <span>Time: {startTime}{endTime ? ` – ${endTime}` : ""}</span>
+                        {event.duration && <span style={{ color: subtleText }}>Duration: {event.duration} min</span>}
                       </div>
                       {event.meetingLink && (
                         <a
                           href={event.meetingLink}
                           target="_blank"
                           rel="noreferrer"
-                          className="absolute bottom-4 right-4 text-sm text-[#1a73e8] font-medium hover:underline"
+                          className="absolute bottom-4 right-4 text-sm font-medium hover:underline"
+                          style={{ color: linkColor }}
                           onClick={(e) => e.stopPropagation()}
                         >
                           Join meeting
                         </a>
                       )}
                       {event.teamMember && (
-                        <p className="mt-2 text-xs text-[#5f6368]">Owner: {event.teamMember}</p>
+                        <p className="mt-2 text-xs" style={{ color: subtleText }}>Owner: {event.teamMember}</p>
                       )}
                       <Button
                         variant="link"
